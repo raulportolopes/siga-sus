@@ -253,6 +253,8 @@ tfoot td{font-weight:800;background:var(--surface-3);border-bottom:0}
 td.trecho{color:var(--ink);min-width:260px;line-height:1.35}
 .regra-pal{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);line-height:1.5;min-width:220px}
 .nota-valor{flex-basis:100%;font-size:12.5px;color:var(--ink-3)}
+.sem-valor{display:inline-block;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;cursor:help;white-space:nowrap}
+.sem-valor-motivo{color:var(--ink-2);margin-top:2px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--azul-escuro);color:#fff;padding:11px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:20;box-shadow:var(--shadow);max-width:calc(100vw - 32px)}
 :root[data-theme="dark"] .toast{background:#E5ECF6;color:#071D41}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .toast{background:#E5ECF6;color:#071D41}}
@@ -693,6 +695,9 @@ function qtdIA(x){return x.qtdFixa!=null?x.qtdFixa:Object.values(x.dias||{}).red
 function qtd(x){return x.qtdManual!=null?x.qtdManual:qtdIA(x)}
 function valorUnit(x){const s=sigtapIndex.get(x.codigo);return s?s.valor:null}
 function nomeSigtap(x){const s=sigtapIndex.get(x.codigo);return s?s.nome:null}
+/* Por que o código não soma na AIH: só tem valor no ambulatório (SA) ou a tabela não traz valor (custeio fixo, como PAB e Vigilância) */
+function motivoSemValor(x){const s=sigtapIndex.get(x.codigo);if(!s||s.valor!==0)return "";
+  return s.sa>0?`Não soma na internação (só no ambulatório vale ${BRL.format(s.sa)}): lance no MV para registro.`:"Sem valor no SIGTAP (custeio fixo): lance no MV para registro."}
 function permanencia(p){const a=parseData(p.internacao.admissao),b=parseData(p.internacao.alta);if(!a||!b)return null;return Math.round((b-a)/864e5)}
 function listaDias(p){
   const set=new Set();
@@ -808,20 +813,20 @@ function htmlEspelho(p,valor){
   const procs=p.procedimentos; const confer=procs.filter(x=>x.conferido).length;
   return `<div class="tabela-rola"><table>
     <thead><tr><th class="c">Conferido</th><th>Código SIGTAP</th><th>Procedimento</th><th>Onde está</th><th class="r">Qtd.</th><th class="r">Valor unit.</th><th class="r">Subtotal</th><th class="c">Leitura</th></tr></thead>
-    <tbody>${procs.map((x,i)=>{const v=valorUnit(x);const q=qtd(x);const alt=x.qtdManual!=null&&x.qtdManual!==qtdIA(x);const nome=nomeSigtap(x);
+    <tbody>${procs.map((x,i)=>{const v=valorUnit(x);const q=qtd(x);const alt=x.qtdManual!=null&&x.qtdManual!==qtdIA(x);const nome=nomeSigtap(x);const motivo=motivoSemValor(x);
       return `<tr class="${x.conferido?"conferido":""}">
       <td class="c"><input type="checkbox" class="chk" id="chk-${i}" data-i="${i}" ${x.conferido?"checked":""} aria-label="Conferido"></td>
       <td class="mono num" style="white-space:nowrap">${fmtCod(x.codigo)}</td>
-      <td><div class="proc-nome">${esc(nome||x.descricao)}${x.principal?'<span class="tag-principal">principal</span>':""}</div>${x.observacao?`<div class="proc-sub">${esc(x.observacao)}</div>`:(!x.principal&&nome?`<div class="proc-sub">No prontuário: ${esc(x.descricao.toLowerCase())}</div>`:"")}</td>
+      <td><div class="proc-nome">${esc(nome||x.descricao)}${x.principal?'<span class="tag-principal">principal</span>':""}</div>${x.observacao?`<div class="proc-sub">${esc(x.observacao)}</div>`:(!x.principal&&nome?`<div class="proc-sub">No prontuário: ${esc(x.descricao.toLowerCase())}</div>`:"")}${motivo?`<div class="proc-sub sem-valor-motivo">${esc(motivo)}</div>`:""}</td>
       <td style="white-space:nowrap;color:var(--ink-2)">${esc(x.fonte||"—")}</td>
       <td class="r"><input type="number" min="0" class="qtd num ${alt?"alterada":""}" id="qtd-${i}" data-i="${i}" value="${q}" aria-label="Quantidade" title="${alt?"Alterado pelo faturista. O leitor contou "+qtdIA(x):"Contado pelo leitor"}"></td>
-      <td class="r num">${!x.codigo?'<span style="color:var(--ink-3)">incluso</span>':v==null?'<span style="color:var(--ink-3)">fora da tabela</span>':BRL.format(v)}</td>
-      <td class="r num" style="font-weight:700">${v==null?"—":BRL.format(v*q)}</td>
+      <td class="r num">${!x.codigo?'<span style="color:var(--ink-3)">incluso</span>':v==null?'<span style="color:var(--ink-3)">fora da tabela</span>':v===0?`<span class="sem-valor" title="${esc(motivo)}">sem valor</span>`:BRL.format(v)}</td>
+      <td class="r num" style="font-weight:700">${v==null||v===0?'<span style="color:var(--ink-3);font-weight:400">—</span>':BRL.format(v*q)}</td>
       <td class="c"><span class="conf ${esc(x.confianca||"media")}">${{alta:"segura",media:"conferir",baixa:"duvidosa"}[x.confianca]||"conferir"}</span></td>
     </tr>`}).join("")}</tbody>
     <tfoot><tr><td></td><td colspan="3">Total da conta</td><td class="r num">${procs.filter(x=>!x.principal).reduce((a,x)=>a+qtd(x),0)}</td><td></td><td class="r num">${BRL.format(valor)}</td><td></td></tr></tfoot>
   </table></div>
-  <div class="rodape-tab"><span><b class="num">${confer}</b> de <b class="num">${procs.length}</b> linhas conferidas</span><div class="barra"><i style="width:${procs.length?confer/procs.length*100:0}%"></i></div><span class="nota-valor">Valores SIGTAP ${esc(S.competencia)}: serviço hospitalar + profissional (SH + SP). Itens com R$ 0,00 já estão no valor do procedimento principal ou da diária.</span></div>`;
+  <div class="rodape-tab"><span><b class="num">${confer}</b> de <b class="num">${procs.length}</b> linhas conferidas</span><div class="barra"><i style="width:${procs.length?confer/procs.length*100:0}%"></i></div><span class="nota-valor">Valores SIGTAP ${esc(S.competencia)}: serviço hospitalar + profissional (SH + SP). Itens "sem valor" e "incluso" entram na contagem para o MV, mas não somam na AIH: a tabela SIGTAP não paga esses procedimentos à parte na internação.</span></div>`;
 }
 function htmlMapa(p){
   const ds=listaDias(p); const procs=p.procedimentos.filter(x=>!x.principal);
