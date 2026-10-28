@@ -72,6 +72,10 @@ body.lendo{overflow:hidden}
 @keyframes carr-in{from{opacity:0}to{opacity:1}}
 @keyframes carr-scan{to{top:calc(100% - 15px)}}
 @keyframes carr-gira{to{transform:rotate(360deg)}}
+.carr-cancelar{margin-top:16px}
+.amostra-box{margin-top:14px;padding:14px 16px;border:1px dashed var(--linha,#cfd8e3);border-radius:10px;font-size:14px;color:var(--ink-2)}
+.amostra-box p{margin:0 0 10px}
+.amostra-txt{width:100%;margin-top:12px;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;padding:10px;border-radius:8px;border:1px solid var(--linha,#cfd8e3);background:var(--surface);color:var(--ink);resize:vertical}
 .mais-linhas{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 4px 2px;font-size:13.5px;color:var(--ink-2)}
 @media (prefers-reduced-motion:reduce){.carregando,.carr-scan,.carr-etapas li.ativa .m{animation:none}}
 .toast{position:fixed''')

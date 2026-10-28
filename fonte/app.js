@@ -272,7 +272,15 @@ function mostraProgresso(etapa,detalhe,erro){
   box.innerHTML=`<div class="painel progresso">
     <h3 style="font-size:17px">${esc(box.dataset.arquivo||"")}</h3>
     <ol class="etapas">${ETAPAS.map((t,i)=>`<li class="${i<etapa?"feita":i===etapa&&!erro?"ativa":""}"><span class="m"></span>${t}${i===etapa&&detalhe&&!erro?` <span style="color:var(--ink-3);font-weight:500">· ${esc(detalhe)}</span>`:""}</li>`).join("")}</ol>
-    ${erro?`<div class="msg erro">${esc(erro)}</div>`:""}</div>`;
+    ${erro?`<div class="msg erro">${esc(erro)}</div>`:""}
+    ${erro&&S.amostra?`<div class="amostra-box"><p>Para o leitor aprender este modelo, gere uma amostra do texto <b>sem os dados do paciente</b>: nomes, documentos e números são apagados e as datas mudam. Confira o texto e mande para a equipe do SIGA-SUS.</p><button class="btn pri" id="bt-amostra">Gerar amostra sem dados do paciente</button><div id="amostra-saida"></div></div>`:""}</div>`;
+  const bt=$("#bt-amostra");
+  if(bt)bt.onclick=()=>{
+    const txt=amostraAnonima(S.amostra.paginas,S.amostra.arquivo,S.amostra.nOcr);
+    $("#amostra-saida").innerHTML=`<textarea class="amostra-txt" readonly rows="12" aria-label="Amostra sem dados do paciente">${esc(txt)}</textarea><div class="pc-botoes"><button class="btn" id="bt-amostra-copiar">Copiar texto</button><button class="btn pri" id="bt-amostra-baixar">Baixar arquivo</button></div>`;
+    $("#bt-amostra-baixar").onclick=()=>baixaTexto(txt,"amostra_sem_dados_do_paciente.txt");
+    $("#bt-amostra-copiar").onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast("Amostra copiada")}catch(e){const a=$(".amostra-txt");a.focus();a.select();toast("Texto selecionado: copie com Ctrl+C")}};
+  };
 }
 const pausa=ms=>new Promise(r=>setTimeout(r,ms));
 /* Cópia autorizada: só no site, quando o endereço de recebimento estiver configurado. Nunca envia sem a pessoa clicar em "Guardar cópia" */
@@ -298,8 +306,8 @@ function perguntaCopia(nome){return new Promise(fim=>{
 const LIMITE_COPIA=30*1024*1024;
 const mb=b=>(b/1048576).toLocaleString("pt-BR",{maximumFractionDigits:0})+" MB";
 /* Tempo que falta na leitura das folhas, a partir do ritmo até agora */
-function faltam(i,n,ms){
-  if(n<200||i<20||i>=n)return "";
+function faltam(i,n,ms,minN=200,minI=20){
+  if(n<minN||i<minI||i>=n)return "";
   const s=ms/i*(n-i)/1000;
   return s<60?" · menos de 1 min":` · faltam cerca de ${Math.ceil(s/60)} min`;
 }
@@ -324,24 +332,32 @@ function abreCarregando(nome){
     <div class="carr-barra"><i></i></div>
     <div class="carr-det"><span></span><b class="num">0%</b></div>
     <ol class="carr-etapas">${ETAPAS.map(t=>`<li><span class="m"></span>${t}</li>`).join("")}</ol>
+    <button class="btn carr-cancelar" type="button" hidden>Cancelar leitura</button>
   </div>`;
   el.hidden=false;document.body.classList.add("lendo");
   const t0=performance.now(),barra=el.querySelector(".carr-barra i"),pct=el.querySelector(".carr-det b"),det=el.querySelector(".carr-det span"),lis=[...el.querySelectorAll(".carr-etapas li")];
-  let pronto=false,aberto=true,lidas=null;
+  let pronto=false,aberto=true,lidas=null,etapaMin=0,cancelado=false,aoCancelar=null;
+  const btCancelar=el.querySelector(".carr-cancelar");
+  btCancelar.onclick=()=>{cancelado=true;btCancelar.disabled=true;btCancelar.textContent="Cancelando…";aoCancelar&&aoCancelar()};
   (function quadro(){if(!aberto)return;
     /* PDF grande: a barra segue as folhas já lidas, e não só o relógio */
     const f=pronto?1:Math.min(.94,(performance.now()-t0)/DUR_LEITURA,lidas===null?1:lidas*.94);
-    const et=pronto?ETAPAS.length:Math.min(ETAPAS.length-1,Math.floor(f/.94*ETAPAS.length));
+    const et=pronto?ETAPAS.length:Math.max(etapaMin,Math.min(ETAPAS.length-1,Math.floor(f/.94*ETAPAS.length)));
     barra.style.width=(f*100).toFixed(1)+"%";pct.textContent=Math.round(f*100)+"%";
     lis.forEach((li,i)=>li.className=i<et?"feita":i===et?"ativa":"");
     requestAnimationFrame(quadro)})();
   return {
     detalhe:t=>{det.textContent=t},
     folhas:(i,n)=>{lidas=i/n},
+    /* OCR: a barra recomeça para as folhas escaneadas, mas a lista continua em "Extraindo o texto" */
+    ocr:(sim)=>{etapaMin=sim?1:0;btCancelar.hidden=!sim},
+    cancelado:()=>cancelado,
+    aoCancelar:fn=>{aoCancelar=fn},
     termina:async()=>{await pausa(Math.max(0,DUR_LEITURA-(performance.now()-t0)));pronto=true;det.textContent="Pronto";await pausa(300)},
     fecha:()=>{aberto=false;el.hidden=true;document.body.classList.remove("lendo")}
   };
 }
+const limpaTexto=t=>String(t).replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim();
 async function extraiPDF(arquivo,onPagina){
   if(!window.pdfjsLib)throw new Error("O leitor de PDF não carregou. Confira a internet e recarregue a página.");
   const pdf=await pdfjsLib.getDocument({data:await arquivo.arrayBuffer()}).promise;
@@ -351,7 +367,7 @@ async function extraiPDF(arquivo,onPagina){
       const pg=await pdf.getPage(i);const tc=await pg.getTextContent();
       let txt="",ultY=null;
       for(const it of tc.items){const y=it.transform?it.transform[5]:null;if(ultY!==null&&y!==null&&Math.abs(y-ultY)>2&&!txt.endsWith("\n"))txt+="\n";txt+=it.str;if(it.hasEOL)txt+="\n";ultY=y}
-      paginas.push(txt.replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim());
+      paginas.push(limpaTexto(txt));
       pg.cleanup(); /* solta a memória da folha: prontuários de milhares de folhas */
       if(i%10===0||i===pdf.numPages)onPagina(i,pdf.numPages);
       if(i%25===0)await pausa(0); /* deixa a tela atualizar quando o pdf.js roda sem worker */
@@ -359,6 +375,84 @@ async function extraiPDF(arquivo,onPagina){
   }finally{pdf.destroy()}
   return paginas;
 }
+/* ============ OCR: folhas escaneadas (imagem) ============
+   Tesseract.js roda dentro do navegador: o prontuário não sai do computador.
+   Só é baixado quando o PDF tem folha escaneada. Lê bem texto impresso; letra à mão, quase nada. */
+const OCR_CDN="https://cdn.jsdelivr.net/npm/";
+const OCR_OPC={workerPath:OCR_CDN+"tesseract.js@5.1.1/dist/worker.min.js",corePath:OCR_CDN+"tesseract.js-core@5.1.1",langPath:OCR_CDN+"@tesseract.js-data/por@1.0.0/4.0.0_best_int"};
+const LETRAS_MIN=120; /* folha com menos letras que isso é tratada como imagem e passa pelo OCR */
+function carregaScript(src){return new Promise((ok,falha)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>falha(new Error("Não consegui baixar o leitor de folhas escaneadas (OCR). Confira a internet e tente de novo."));document.head.appendChild(s)})}
+async function ocrFolhas(arquivo,indices,paginas,aoAvancar,tela){
+  const cancela=new Promise((_,falha)=>tela.aoCancelar(()=>falha(Object.assign(new Error("Leitura cancelada"),{code:"cancelled"}))));
+  cancela.catch(()=>{});
+  const espera=x=>Promise.race([x,cancela]);
+  if(!window.Tesseract)await espera(carregaScript(OCR_CDN+"tesseract.js@5.1.1/dist/tesseract.min.js"));
+  const movel=/iPhone|iPad|Android|Mobile/i.test(navigator.userAgent);
+  const nW=Math.max(1,Math.min(movel?2:4,(navigator.hardwareConcurrency||2)-1,indices.length));
+  const sched=Tesseract.createScheduler();
+  try{
+    const ws=await espera(Promise.all(Array.from({length:nW},()=>Tesseract.createWorker("por",1,OCR_OPC))));
+    ws.forEach(w=>sched.addWorker(w));
+    const pdf=await espera(pdfjsLib.getDocument({data:await arquivo.arrayBuffer()}).promise);
+    try{
+      let feitas=0;const fila=new Set();
+      for(const i of indices){
+        if(tela.cancelado())await cancela;
+        const pg=await espera(pdf.getPage(i+1));
+        const v1=pg.getViewport({scale:1});
+        const vp=pg.getViewport({scale:Math.min(2.5,2200/Math.max(v1.width,v1.height))}); /* cerca de 190 dpi */
+        const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+        const ctx=cv.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,cv.width,cv.height);
+        await espera(pg.render({canvasContext:ctx,viewport:vp}).promise);pg.cleanup();
+        const img=await new Promise(r=>cv.toBlob(r,"image/png"));cv.width=cv.height=0;
+        const job=sched.addJob("recognize",img).then(r=>{paginas[i]=limpaTexto(r.data.text);aoAvancar(++feitas,indices.length)});
+        fila.add(job);job.then(()=>fila.delete(job),()=>fila.delete(job));
+        if(fila.size>=nW*2)await espera(Promise.race(fila));
+      }
+      await espera(Promise.all(fila));
+    }finally{pdf.destroy()}
+  }finally{sched.terminate().catch(()=>{})}
+}
+
+/* ============ Amostra sem dados do paciente ============
+   Para ensinar o leitor um modelo novo de prontuário: folhas de exemplo com nomes, documentos e números apagados e datas deslocadas.
+   A pessoa confere o texto antes de mandar. */
+const _vog=s=>s.replace(/[aáàâã]/gi,"[aáàâã]").replace(/[eéê]/gi,"[eéê]").replace(/[ií]/gi,"[ií]").replace(/[oóôõ]/gi,"[oóôõ]").replace(/[uúü]/gi,"[uúü]").replace(/[cç]/gi,"[cç]");
+const NAO_NOME=new Set("DAS DOS DATA NASC NASCIMENTO SEXO IDADE ANOS LEITO CNS CPF REGISTRO ATENDIMENTO CONVENIO CONVÊNIO SUS MASCULINO FEMININO PRONTUARIO PRONTUÁRIO ENTRADA INTERNACAO INTERNAÇÃO SETOR CLINICA CLÍNICA MEDICA MÉDICA ENFERMARIA UTI HORA NOME MAE MÃE PAI SOCIAL COMPLETO RESPONSAVEL RESPONSÁVEL ACOMPANHANTE PACIENTE HOSPITAL PDF COPIA CÓPIA SCAN DIGITALIZADO".split(" "));
+function amostraAnonima(paginas,arquivo,nOcr){
+  const n=paginas.length,idx=new Set();
+  for(let i=0;i<Math.min(6,n);i++)idx.add(i);
+  for(let k=1;k<=14&&n>6;k++)idx.add(Math.min(n-1,Math.round(5+(n-6)*k/14)));
+  const nomes=new Set();
+  const junta=s=>String(s).split(/[^A-Za-zÀ-ú]+/).forEach(w=>{const u=w.toUpperCase();if(w.length>=3&&!NAO_NOME.has(u))nomes.add(u)});
+  junta(String(arquivo).replace(/\.pdf$/i,""));
+  const ROT_NOME=/\b(PACIENTE|NOME(?:\s+(?:DO\s+PACIENTE|SOCIAL|COMPLETO))?|M[ÃA]E|NOME\s+DA\s+M[ÃA]E|PAI|RESPONS[ÁA]VEL|ACOMPANHANTE)\s*:\s*([^\n|;:]{3,60})/gi;
+  idx.forEach(i=>{for(const m of String(paginas[i]).matchAll(ROT_NOME))junta(m[2])});
+  const reNome=nomes.size?new RegExp("(^|[^A-Za-zÀ-ú])("+[...nomes].sort((a,b)=>b.length-a.length).map(w=>_vog(w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))).join("|")+")(?![A-Za-zÀ-ú])","gi"):null;
+  const desloc=40+Math.floor(Math.random()*360);
+  const mudaData=(d,m,a)=>{const ano=a.length===2?2000+ +a:+a;const x=new Date(ano,+m-1,+d);if(isNaN(x))return null;x.setDate(x.getDate()-desloc);const dd=String(x.getDate()).padStart(2,"0"),mm=String(x.getMonth()+1).padStart(2,"0");return `${dd}/${mm}/${a.length===2?String(x.getFullYear()).slice(2):x.getFullYear()}`};
+  const limpa=t=>{
+    t=String(t)
+      .replace(/\b(CPF|CNS|CART[ÃA]O\s+(?:SUS|NACIONAL)[^:\n]{0,12}|RG|N[º°o]?\.?\s*(?:DO\s+)?PRONTU[ÁA]RIO|PRONTU[ÁA]RIO|ATENDIMENTO|REGISTRO(?:\s+GERAL)?(?:\s*\(RG\))?|MATR[ÍI]CULA|TELEFONE|FONE|CELULAR|ENDERE[ÇC]O|LOGRADOURO|BAIRRO|CEP|CIDADE|MUNIC[ÍI]PIO|NATURALIDADE|E-?MAIL|DATA\s+DE\s+NASC\w*|DT\.?\s*NASC\w*|NASCIMENTO|IDADE|PROFISS[ÃA]O|ESTADO\s+CIVIL)\s*:\s*[^\n|]{1,70}?(?=\s{2,}|\s+\||\||\n|$|\s+[A-ZÀ-Ú][A-ZÀ-Ú.\/ ]{1,25}:)/gi,"$1: [OCULTO]")
+      .replace(/\b(Assinad[oa](?:\s+eletronicamente)?\s+por|Profissional|Prescrit[oa]\s+por|Checad[oa]\s+por|Executad[oa]\s+por|Realizad[oa]\s+por|Solicitante|Usu[áa]rio)\s*:?\s*[^\n|]{2,60}?(?=\s+-\s+|\s{2,}|\||\n|$)/gi,"$1: [PROFISSIONAL]")
+      .replace(/\b(Dr\.?|Dra\.?|Enf[ªa]?\.?|Enfermeir[oa]|T[ée]c\.?|T[ée]cnic[oa](?:\s+de\s+enfermagem)?|Aux\.?|Auxiliar)\s+((?:[A-ZÀ-Ú][\wÀ-ú]+)(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ú][\wÀ-ú]+){0,3})/g,"$1 [PROFISSIONAL]")
+      .replace(/\b(CRM|COREN|CRF|CRN|CREFITO|CRP|CRO)\b[^\n\d]{0,12}[\d.\-\/]+/gi,"$1 [NÚMERO]")
+      .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[EMAIL]")
+      .replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/g,(x,d,m,a)=>mudaData(d,m,a)||x)
+      .replace(/\d{3}\.\d{3}\.\d{3}-\d{2}/g,"[NÚMERO]")
+      .replace(/\b\d{3}\s\d{4}\s\d{4}\s\d{4}\b/g,"[NÚMERO]")
+      .replace(/\(?\b\d{2}\)?\s?9?\d{4}-\d{4}\b/g,"[NÚMERO]")
+      .replace(/\d{5,}/g,"[NÚMERO]");
+    if(reNome)t=t.replace(reNome,"$1[NOME]");
+    return t.length>4000?t.slice(0,4000)+"\n[…]":t;
+  };
+  const lista=[...idx].sort((a,b)=>a-b);
+  return ["AMOSTRA SIGA-SUS SEM DADOS DO PACIENTE",
+    "Nomes, documentos e números foram apagados e as datas foram deslocadas. Confira antes de enviar.",
+    `Documento com ${n} folhas${nOcr?`, ${nOcr} delas escaneadas e lidas por OCR`:""}. Folhas desta amostra: ${lista.map(i=>i+1).join(", ")}.`,""]
+    .concat(lista.map(i=>`===== FOLHA ${i+1} =====\n${limpa(paginas[i])||"(sem texto)"}`)).join("\n");
+}
+function baixaTexto(txt,nome){const url=URL.createObjectURL(new Blob([txt],{type:"text/plain;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
 async function analisar(arquivo){
   if(!/\.pdf$/i.test(arquivo.name)&&arquivo.type!=="application/pdf"){toast("Envie um arquivo PDF");return}
   ir("nova");
@@ -367,17 +461,28 @@ async function analisar(arquivo){
   const copia=URL_COPIAS&&!grande&&await perguntaCopia(arquivo.name)?enviaCopia(arquivo):null;
   const tela=abreCarregando(arquivo.name);
   const t0=performance.now();
-  let etapa=0;
+  let etapa=0,lidas=null,nOcr=0;S.amostra=null;
   try{
     etapa=1;
     const paginas=await extraiPDF(arquivo,(i,n)=>{tela.folhas(i,n);tela.detalhe(`Folha ${i.toLocaleString("pt-BR")} de ${n.toLocaleString("pt-BR")}${faltam(i,n,performance.now()-t0)}`)});
+    lidas=paginas;
+    /* Folhas escaneadas (imagem, sem texto): reconhecimento de texto aqui mesmo no navegador */
+    const imagens=paginas.reduce((a,t,i)=>(t.replace(/\s/g,"").length<LETRAS_MIN&&a.push(i),a),[]);
+    if(imagens.length){
+      nOcr=imagens.length;tela.ocr(true);tela.folhas(0,nOcr);
+      tela.detalhe(`${nOcr.toLocaleString("pt-BR")} folha(s) escaneada(s): preparando o reconhecimento de texto`);
+      const t1=performance.now();
+      await ocrFolhas(arquivo,imagens,paginas,(k,m)=>{tela.folhas(k,m);tela.detalhe(`Folha escaneada ${k.toLocaleString("pt-BR")} de ${m.toLocaleString("pt-BR")}${faltam(k,m,performance.now()-t1,1,3)}`)},tela);
+      tela.ocr(false);
+    }
     tela.detalhe(paginas.length===1?"1 folha":`${paginas.length} folhas`);
     const letras=paginas.join("").replace(/\s/g,"").length;
-    if(letras/paginas.length<40)throw new Error("Este PDF é só imagem (folhas escaneadas) e não tem texto para ler. Ele precisa passar por OCR, o reconhecimento de texto, antes. Isso entra numa próxima etapa do projeto.");
+    if(letras/paginas.length<40)throw new Error(nOcr?"Não consegui reconhecer texto nas folhas escaneadas. Pode ser letra à mão, que o reconhecimento quase não lê, ou imagem muito clara ou escura.":"Este PDF não tem texto para ler.");
     etapa=2;
     const p=montaProntuario("pdf"+Date.now(),"envio",arquivo.name,paginas,performance.now()-t0);
+    if(nOcr)p.alertas.unshift(`${nOcr} de ${paginas.length} folhas eram imagem (escaneadas) e foram lidas por reconhecimento de texto (OCR). O OCR pode trocar letras e quase não lê letra à mão: confira as quantidades no Rastreio.`);
     etapa=4;
-    if(p.procedimentos.filter(x=>!x.principal).length===0)throw new Error("Não encontrei procedimentos no padrão conhecido. Confira se é um prontuário de internação ou mande um exemplo deste modelo para ajustarmos as regras.");
+    if(p.procedimentos.filter(x=>!x.principal).length===0)throw new Error(`Não encontrei procedimentos no padrão conhecido${nOcr?` (li ${paginas.length} folhas, ${nOcr} delas por reconhecimento de texto)`:""}. Este modelo de prontuário ainda não está nas regras do leitor.`);
     await tela.termina();tela.fecha();
     S.prontuarios.push(p);S.aba="espelho";
     const st=copia?await Promise.race([copia,pausa(50).then(()=>null)]):undefined;
@@ -386,6 +491,8 @@ async function analisar(arquivo){
     ir("resultado",p.id);
   }catch(e){
     tela.fecha();
+    if(e&&e.code==="cancelled"){$("#progresso-box").hidden=true;toast("Leitura cancelada");return}
+    if(lidas&&lidas.join("").replace(/\s/g,"").length>200)S.amostra={paginas:lidas,arquivo:arquivo.name,nOcr};
     mostraProgresso(etapa,"",e&&e.message?e.message:"Não foi possível ler este PDF. Tente de novo.");
   }
 }
