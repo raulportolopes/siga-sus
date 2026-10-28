@@ -4,7 +4,7 @@
    tipo "diaria": no máximo 1 por dia; períodos "13/07 a 18/07" contam cada dia. */
 const REGRAS = [
   {id:"pa",    codigo:"0301100039", nome:"Aferição de pressão arterial", tipo:"contagem", padrao:/press[aã]o arterial/i},
-  {id:"glic",  codigo:"0214010015", nome:"Glicemia capilar", tipo:"contagem", padrao:/glicemia capilar|\bHGT\b|dextro/i},
+  {id:"glic",  codigo:"0214010015", nome:"Glicemia capilar", tipo:"contagem", padrao:/glicemia\s+(capilar|perif[ée]rica|digital)|glicemia\s*[:=]\s*\d{2,3}|\bglic\.?\s*(cap\.?\s*)?[:=]\s*\d{2,3}|\bHGT\b|\bdextro|glicosimetria|glicos[íi]metro|\bGC\s*[:=]?\s*\d{2,3}\s*mg/i, excluir:/jejum|s[ée]ric|plasm[áa]tic|glicada|hemoglobina/i},
   {id:"im",    codigo:"0301100209", nome:"Medicação intramuscular", tipo:"contagem", padrao:/intramuscular|\bvia IM\b/i},
   {id:"ev",    codigo:"0301100195", nome:"Medicação endovenosa", tipo:"contagem", padrao:/(aplica|administra)\S*\s+(de\s+)?medica\S*\s+(endovenos|intravenos|EV\b)/i},
   {id:"pcr",   codigo:"0213010720", nome:"RT-PCR para SARS-CoV-2", tipo:"contagem", padrao:/RT-?PCR|swab nasofar/i, excluir:/resultado|liberad|positivo|negativo/i},
@@ -24,12 +24,24 @@ const REGRAS = [
   {id:"svd",   codigo:"0301100055", nome:"Sondagem vesical", tipo:"contagem", padrao:/sonda(gem)?\s+vesical|\bSVD\b/i, excluir:/retirad/i},
   {id:"sng",   codigo:"0301100179", nome:"Sondagem nasogástrica", tipo:"contagem", padrao:/sonda(gem)?\s+naso(g[aá]strica|enteral)|\bSN[GE]\b/i, excluir:/retirad/i}
 ];
+/* Atendimentos de profissionais de nível superior e acompanhante: valem na linha inteira, inclusive no título
+   da evolução. Consulta: no máximo 1 por folha e por dia para cada profissional (cabeçalho e assinatura não contam duas vezes). */
+const REGRAS_LINHA = [
+  {id:"cons_enf", codigo:"0301010048", nome:"Consulta de enfermagem", tipo:"atendimento", nota:"CBO 223505 · Enfermeiro", padrao:/consulta\s+de\s+enfermagem|evolu\S*\s+(d[aoe]s?\s+)?enfermeir|evolu\S*\s+(d[aoe]\s+)?enfermagem|hist[óo]rico\s+de\s+enfermagem|admiss[ãa]o\s+de\s+enfermagem|\bSAE\b|sistematiza\S*\s+da\s+assist[êe]ncia/i, excluir:/t[ée]cnic|auxiliar/i},
+  {id:"cons_soc", codigo:"0301010048", nome:"Atendimento do serviço social", tipo:"atendimento", nota:"CBO 251605 · Assistente social", padrao:/servi[çc]o\s+social|assistente\s+social|evolu\S*\s+(d[oa]\s+)?social|atendimento\s+social|\bCRESS\b/i},
+  {id:"cons_nut", codigo:"0301010048", nome:"Atendimento de nutrição", tipo:"atendimento", nota:"CBO 223710 · Nutricionista", padrao:/nutricionista|evolu\S*\s+(d[aoe]\s+)?nutri|avalia\S*\s+nutricional|parecer\s+(d[aoe]\s+)?nutri|atendimento\s+(d[aoe]\s+)?nutri|triagem\s+nutricional|acompanhamento\s+nutricional|\bCRN[\s-]*\d/i},
+  {id:"acomp",    codigo:"0802010040", nome:"Diária de acompanhante de idoso", tipo:"acompanhante", padrao:/acompanhante|acompanhad[oa]\s+(d[aoe]s?|pel[oa]s?|por)\s/i, excluir:/sem\s+acompanhante|desacompanhad|n[ãa]o\s+(possui|tem|h[áa]|est[áa])\s+(com\s+)?acompanhante|aus[êe]ncia\s+de\s+acompanhante/i}
+];
+/* Glicemia medida (com valor) conta mesmo dentro de texto corrido de evolução: "HGT: 132", "Glicemia capilar 180 mg/dl" */
+const MEDIDA_GLIC=/(glicemia(?:\s+(?:capilar|perif[ée]rica|digital))?|\bglic\.?(?:\s*cap\.?)?|\bHGT|\bdextro|\bGC)(?:\s*\(?\s*(?:[àa]s\s*)?\d{1,2}(?:[:hH]\d{2})?\s*(?:h(?:s|oras)?)?\s*\)?(?=\s*[:=-]))?\s*(?:de\s+)?[:=-]?\s*(\d{2,3})(?![\d,.]\d)(?!\s*%)/gi;
 const REGRA_UTI = {id:"uti", codigo:"0802010083", nome:"Diária de UTI adulto", tipo:"diaria"};
-const CID_DESC = {"U07.1":"COVID-19, vírus identificado","U07.2":"COVID-19, vírus não identificado","B34.2":"Infecção por coronavírus","B97.2":"Coronavírus como causa de doença","J18.9":"Pneumonia não especificada","J18.0":"Broncopneumonia não especificada","J15.9":"Pneumonia bacteriana não especificada","J11.1":"Influenza com manifestações respiratórias","J96.0":"Insuficiência respiratória aguda","I10":"Hipertensão essencial","E11.9":"Diabetes mellitus tipo 2 sem complicações","A41.9":"Sepse não especificada","N39.0":"Infecção do trato urinário","I21.9":"Infarto agudo do miocárdio","I64":"Acidente vascular cerebral","J44.1":"DPOC com exacerbação aguda","I50.9":"Insuficiência cardíaca"};
+const CID_DESC = {"U07.1":"COVID-19, vírus identificado","U07.2":"COVID-19, vírus não identificado","B34.2":"Infecção por coronavírus","B97.2":"Coronavírus como causa de doença","J18.9":"Pneumonia não especificada","J18.0":"Broncopneumonia não especificada","J15.9":"Pneumonia bacteriana não especificada","J11.1":"Influenza com manifestações respiratórias","J96.0":"Insuficiência respiratória aguda","I10":"Hipertensão essencial","E11.9":"Diabetes mellitus tipo 2 sem complicações","A41.9":"Sepse não especificada","N39.0":"Infecção do trato urinário","I21.9":"Infarto agudo do miocárdio","I64":"Acidente vascular cerebral","J44.1":"DPOC com exacerbação aguda","I50.9":"Insuficiência cardíaca","A49.0":"Infecção por estafilococos não especificada","A49.1":"Infecção por estreptococos não especificada","A41.0":"Septicemia por Staphylococcus aureus","L03.1":"Celulite de outras partes do membro","L02.4":"Abscesso cutâneo, furúnculo e antraz do membro","N18.9":"Doença renal crônica não especificada","F03":"Demência não especificada","E14.9":"Diabetes mellitus não especificado"};
 function procPrincipalPorCid(cid){
   if(!cid)return null;
   if(/^(U07|B2[5-9]|B3[0-4]|B97\.2)/.test(cid))return {codigo:"0303010193",descricao:"Tratamento de outras doenças causadas por vírus (B25 a B34)"};
   if(/^J(09|1[0-8])/.test(cid))return {codigo:"0303140151",descricao:"Tratamento de pneumonias ou influenza (gripe)"};
+  if(/^(A49\.0|L00|A05\.0)/.test(cid))return {codigo:"0303080060",descricao:"Tratamento de estafilococcias"};
+  if(/^A49\.1/.test(cid))return {codigo:"0303080078",descricao:"Tratamento de estreptococcias"};
   return null;
 }
 
@@ -61,21 +73,24 @@ function lerProntuario(paginas){
   // 2. Cabeçalho do paciente
   const pega=(re,i=1)=>{const m=re.exec(texto);return m?(m[i]||"").trim():null};
   const pac={
-    nome:pega(/PACIENTE\s*:\s*([^|\n]+?)(?=\s*\||\s+DATA DE NASC|\s+NASC|\n|$)/i),
+    nome:pega(/PACIENTE\s*:\s*([^|\n]+?)(?=\s*\||\s+DATA DE NASC|\s+NASC|\s+DT\.?\s*NASC|\s+DATA\s+NASC|\n|$)/i),
     registro:pega(/(?:REGISTRO GERAL\s*\(RG\)|REGISTRO|PRONTU[ÁA]RIO\s*N?[º°o]?\.?|\bRG\b)\s*:\s*([\w.\-\/]+)/i),
     leito:pega(/LEITO\s*:\s*([\w\-\/]+(?:\s[A-Z]\b)?)/i),
-    nascimento:pega(/(?:DATA DE NASCIMENTO|NASCIMENTO|\bDN\b)\s*:\s*(\d{2}\/\d{2}\/\d{4})/i),
-    idade:pega(/(?:NASCIMENTO|\bDN\b)\s*:\s*\d{2}\/\d{2}\/\d{4}\s*\((\d{1,3})\s*ANOS?\)/i)
+    nascimento:pega(/(?:DATA DE NASCIMENTO|NASCIMENTO|DATA\s+NASC\.?|DT\.?\s*NASC\.?|\bDN\b)\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i),
+    idade:pega(/(?:NASCIMENTO|\bDN\b)\s*:\s*\d{2}\/\d{2}\/\d{4}\s*\((\d{1,3})\s*ANOS?\)/i)||pega(/\bIDADE\s*:?\s*(\d{1,3})\s*(?:A\b|ANOS?)/i)
   };
   if(pac.nome)pac.nome=_titulo(pac.nome);
   if(pac.idade)pac.idade=+pac.idade;
-  let admissao=pega(/ADMISS[ÃA]O\s*:\s*(\d{2}\/\d{2}\/\d{4})/i)||pega(/DATA\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+  let admissao=pega(/ADMISS[ÃA]O\s*:\s*(\d{2}\/\d{2}\/\d{4})/i)||pega(/(?:DATA\s+D[AE]\s+INTERNA[ÇC][ÃA]O|DT\.?\s*(?:DE\s+)?INTERNA[ÇC][ÃA]O|INTERNAD[OA]\s+EM|DATA\s+D[AE]\s+ENTRADA|DT\.?\s*ENTRADA)\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i)||pega(/DATA\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const altaCab=pega(/(?:DATA\s+D[AE]\s+ALTA|DT\.?\s*(?:DE\s+)?ALTA|DATA\s+D[AE]\s+SA[ÍI]DA|DT\.?\s*SA[ÍI]DA)\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if(!pac.idade&&pac.nascimento&&admissao){const n=pac.nascimento.split("/").map(Number),a=admissao.split("/").map(Number);pac.idade=a[2]-n[2]-((a[1]<n[1]||(a[1]===n[1]&&a[0]<n[0]))?1:0)}
   let ano=admissao?+admissao.slice(6):new Date().getFullYear();
 
   // 3. Varredura linha a linha
   const ROTULO_PROSA=/^(Hist[óo]rico|Conduta|Evolu[çc][ãa]o|Diagn[óo]stico|Parecer|Exame f[íi]sico|Queixa|HDA|Impress[ãa]o|Observa[çc]|Paciente|Hip[óo]tese|Plano|Prescri[çc])/i;
   const contagem=new Map(); const ignorados=[]; const eventos=[]; const jaEvento=new Set(); const medicos=[]; const cids=[]; const folhas=[];
   let dataAtual=admissao?_data(...admissao.split("/")):null, prosa=false, pendente=null;
+  const jaAtend=new Set(); const acompProvas=[]; let cidPend=null, princLaudo=null, linhaAnt="";
   let horaCab="", utiIni=null, utiFim=null, utiProvas=[], alta=null, desfecho=null, diagEntradaTxt=null, viaPA=false, totaisInformados=[];
   const soma=(regra,data,qtd,linha,trecho)=>{
     if(!data)return;
@@ -101,6 +116,8 @@ function lerProntuario(paginas){
       resto=t.slice(m[0].length).replace(/^\s*(a\s+\d{1,2}\/\d{1,2}\/\d{4})?\s*[:–-]?\s*/,"");prosa=false;pendente=null;
       if(/^DATA/i.test(t)&&/ADMISS/i.test(t)){viaPA=/PRONTO ATENDIMENTO|\bPA\b|PRONTO[- ]SOCORRO/i.test(t);const h=/(\d{1,2}:\d{2})/.exec(t);evento(dataAtual,"admissao","Admissão"+(viaPA?" pelo pronto atendimento":""),h&&h[1])}
     }else if((m=/^[-*•]\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/.exec(t))){dataLinha=_data(m[1],m[2],m[3]||ano)}
+    else if((m=/(?:^|[^A-Za-zÀ-ú])(?:DATA|DT\.?)(?:\s*(?:\/|E)\s*HORA)?(?:\s+D[AOE]\s+(?:EVOLU\S*|ATENDIMENTO|REGISTRO|PRESCRI\S*|AVALIA\S*|VERIFICA\S*))?\s*:\s*(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})(?!\d)/i.exec(t))&&!/nasc|emiss|impress|validade|admiss|interna[çc]|alta|sa[íi]da|entrada|solicita/i.test(t.slice(Math.max(0,m.index-25),m.index+m[0].length))){
+      const a=m[3].length===2?2000+ +m[3]:+m[3];const d=_data(m[1],m[2],a);if(d&&a>1990){dataAtual=d;dataLinha=d;ano=a}}
     const hora=(/(?:^|às\s*|[-*•]\s*)(\d{1,2}:\d{2})h?/i.exec(t)||[])[1]||"";
 
     // Alta / óbito
@@ -109,7 +126,7 @@ function lerProntuario(paginas){
     if(/(^|[^A-Za-zÀ-ú])[ÓO]BITO(?![A-Za-zÀ-ú])/i.test(t)&&/constatad|declarad|evolui\S* (a|para) [óo]bito|^\S+\s*-\s*(\d{1,2}:\d{2}h?\s*-\s*)?[ÓO]BITO/i.test(t)){alta=alta||dataLinha;desfecho="Óbito";evento(dataLinha,"obito","Óbito",hora)}
 
     // UTI: entrada e saída
-    const cabecalho=_caixaAlta(t)||/^\[P[ÁA]GINA/i.test(t);
+    const cabecalho=(_caixaAlta(t)&&t.length<=120)||/^\[P[ÁA]GINA/i.test(t);
     if(!cabecalho){
       for(const s of _frases(t)){
         if(/(transfer[eê]ncia|transferid[oa]|admitid[oa]|encaminhad[oa]|internad[oa])\b.{0,40}\bUTI\b/i.test(s)&&!/(alta|sa[ií]da) da UTI|da UTI para/i.test(s)){if(!utiIni){utiIni=dataLinha;utiProvas.push({pag:L.pag,trecho:s})}evento(dataLinha,"transferencia","Transferência para a UTI",hora)}
@@ -119,19 +136,37 @@ function lerProntuario(paginas){
       }
     }
 
-    // CIDs
-    if(/CID/i.test(t)){
-      const tipo=/alta|encerramento|definitiv/i.test(t)?"alta":/atualizad|mudan/i.test(t)?"atualizado":/secund/i.test(t)?"secundario":"entrada";
+    // CIDs: "CID-10: J18.9", "CID PRINCIPAL A49.0 - DESCRIÇÃO", "Diagnóstico: A49.0", ou o código na linha seguinte ao rótulo
+    const RE_CID=/(^|[^A-Za-z0-9.])([A-Z]\d{2}(?:\.\d{1,2})?|[A-Z]\d{3})(?![A-Za-z0-9])(?:\s*\(([^)]{3,60})\)|\s+[-–]\s+([A-ZÀ-Úa-zà-ú][^|;()]{3,70}))?/g;
+    const linhaCid=/CID/i.test(t)||(/Diagn[óo]stic|Hip[óo]tese/i.test(t)&&/(^|[^A-Za-z0-9])[A-Z]\d{2}\.\d/.test(t));
+    if(linhaCid||cidPend){
+      const tipoDe=s=>/secund|associad/i.test(s)?"secundario":/alta|encerramento|definitiv|principal/i.test(s)?"alta":/atualizad|mudan/i.test(s)?"atualizado":null;
+      const tipoLinha=linhaCid?(tipoDe(t)||"entrada"):null;
       const achados=[];
-      for(const c of t.matchAll(/\b([A-Z]\d{2}(?:\.\d{1,2})?)\b(?:\s*\(([^)]{3,60})\))?/g)){
-        achados.push(c[1]);
-        const ex=cids.find(x=>x.cid===c[1]);
-        if(ex){if(tipo==="alta"){ex.ordemAlta=Math.min(ex.ordemAlta,achados.length);if(ex.tipo==="atualizado")ex.tipo="alta"}continue}
-        const desc=(tipo==="entrada"&&diagEntradaTxt)||CID_DESC[c[1]]||(c[2]?_frase(c[2]):"")||"Descrição não informada";
-        cids.push({cid:c[1],descricao:desc,data:dataLinha?_fmt(dataLinha):"",tipo,ordem:cids.length,ordemAlta:tipo==="alta"?achados.length:99});
-      }
-      if(tipo==="atualizado"&&achados.length)evento(dataLinha,"diagnostico",`Diagnóstico atualizado para ${achados.join(" / ")}`,hora);
+      const partes=linhaCid?t.split(/(?=CID)/i):[t];
+      partes.forEach((parte,pi)=>{
+        const tipoP=linhaCid?((pi>0&&tipoDe(parte))||tipoLinha):(achados.length&&cidPend.tipo==="alta"?"secundario":cidPend.tipo);
+        const alvo=linhaCid?parte.replace(/CID[\s-]*10/gi,"CID"):(/^\s*[A-Z]\d{2}/.test(parte)?parte:"");
+        for(const c of alvo.matchAll(RE_CID)){
+          let cod=c[2];if(/^[A-Z]\d{3}$/.test(cod))cod=cod.slice(0,3)+"."+cod[3];
+          if(/^[A-Z]\d{2}$/.test(cod)&&!linhaCid)continue;
+          const tipo=linhaCid?tipoP:(achados.length?(cidPend.tipo==="alta"?"secundario":cidPend.tipo):cidPend.tipo);
+          achados.push(cod);
+          const ex=cids.find(x=>x.cid===cod);
+          if(ex){if(tipo==="alta"){ex.ordemAlta=Math.min(ex.ordemAlta,achados.length);if(ex.tipo==="atualizado")ex.tipo="alta"}continue}
+          const txt=c[3]||c[4]||"";
+          const desc=(tipo==="entrada"&&diagEntradaTxt)||CID_DESC[cod]||(txt?_frase(txt.replace(/\s+CID.*$/i,"")):"")||"Descrição não informada";
+          cids.push({cid:cod,descricao:desc,data:dataLinha?_fmt(dataLinha):"",tipo,ordem:cids.length,ordemAlta:tipo==="alta"?achados.length:99});
+        }
+      });
+      if(tipoLinha==="atualizado"&&achados.length)evento(dataLinha,"diagnostico",`Diagnóstico atualizado para ${achados.join(" / ")}`,hora);
+      if(linhaCid&&!achados.length&&t.length<90)cidPend={tipo:tipoLinha,n:3};
+      else if(cidPend&&(achados.length||--cidPend.n<=0))cidPend=null;
     }
+    // Procedimento solicitado no laudo da AIH (ex.: "PROCEDIMENTO SOLICITADO 03.03.08.006-0 TRATAMENTO DE ...")
+    if(!princLaudo){const pm=/(?:^|[^\d])(0[3-6])\.(\d{2})\.(\d{2})\.(\d{3})-(\d)(?!\d)\s*[-–]?\s*([A-ZÀ-Ú][^|\d]{3,90})?/.exec(t);
+      if(pm&&/procedimento|solicitad/i.test(linhaAnt+" "+t))princLaudo={codigo:pm[1]+pm[2]+pm[3]+pm[4]+pm[5],descricao:pm[6]?_frase(pm[6].replace(/\s+CID.*$/i,"")):"Procedimento do laudo da AIH",pag:L.pag,origem:"laudo"}}
+    linhaAnt=t;
     let dm=/Diagn[óo]stico( de Entrada)?\s*:\s*([^.]+)/i.exec(t);if(dm&&!/CID/i.test(t))diagEntradaTxt=diagEntradaTxt||_frase(dm[2]);
 
     // Eventos de evolução e resultados
@@ -139,11 +174,24 @@ function lerProntuario(paginas){
     if(/^[-*•]/.test(t)&&/resultado|laudo/i.test(t))evento(dataLinha,"exame",t,hora);
     if(/^[-*•]/.test(t)&&/dessatura|evolui\S* com|piora|parada card|instabilidade/i.test(t))evento(dataLinha,"intercorrencia",t,hora);
 
+    // Consultas de nível superior e acompanhante
+    for(const r of REGRAS_LINHA){
+      if(!r.padrao.test(t))continue;
+      const ex=r.excluir&&r.excluir.exec(t);
+      if(ex){ignorados.push({data:dataLinha?_fmt(dataLinha):"",pag:L.pag,trecho:_limpa(t).slice(0,170),regra:r.nome,motivo:`contém "${ex[0].toLowerCase()}"`});continue}
+      if(r.tipo==="acompanhante"){if(acompProvas.length<40)acompProvas.push({data:dataLinha?_fmt(dataLinha):"",pag:L.pag,trecho:_limpa(t).slice(0,170),qtd:0});continue}
+      if(!dataLinha)continue;
+      const k=r.id+"|"+L.pag+"|"+_fmt(dataLinha);
+      if(jaAtend.has(k))continue;jaAtend.add(k);
+      soma(r,dataLinha,1,L,t);
+    }
+
     // Contagem de procedimentos
-    if(cabecalho){prosa=false;pendente=null;continue}
-    if(ROTULO_PROSA.test(t)){prosa=true;pendente=null;continue}
+    const medeGlic=()=>{if(/jejum|s[ée]ric|plasm[áa]tic|glicada/i.test(t))return;let n=0;for(const g of t.matchAll(MEDIDA_GLIC)){const v=+g[2];if(v>=20&&v<=600)n++}if(n)soma(REGRAS.find(r=>r.id==="glic"),dataLinha,n,L,t)};
+    if(cabecalho){prosa=false;pendente=null;medeGlic();continue}
+    if(ROTULO_PROSA.test(t)){prosa=true;pendente=null;medeGlic();continue}
     if(/^[-*•]/.test(t))prosa=false;
-    if(prosa||(ehCabecalhoData&&/^DATA/i.test(t)))continue;
+    if(prosa||(ehCabecalhoData&&/^DATA/i.test(t))){medeGlic();continue}
     if(/^[*•]/.test(t)&&pendente){pendente.forEach(r=>soma(r,dataLinha,1,L,pendente.cab+" — "+t));continue}
     if(!/^[*•]/.test(t))pendente=null;
     const segs=resto.includes("|")?resto.split("|"):_frases(resto);
@@ -174,6 +222,7 @@ function lerProntuario(paginas){
   }
 
   // 4. Fechamento
+  if(!alta&&altaCab){alta=_data(...altaCab.split("/"));desfecho=desfecho||"Alta hospitalar"}
   const altaD=alta, admD=admissao?_data(...admissao.split("/")):null;
   if(utiIni){
     const fim=utiFim||(altaD?_maisDias(altaD,-1):utiIni);
@@ -182,12 +231,23 @@ function lerProntuario(paginas){
     for(let d=new Date(utiIni);d<=fim;d=_maisDias(d,1))c.dias[_fmt(d)]=1;
     contagem.set("uti",c);
   }
+  // Diária de acompanhante de idoso (60 anos ou mais): 1 por pernoite, da admissão até a véspera da saída
+  let notaAcomp=null;
+  if(acompProvas.length){
+    const R=REGRAS_LINHA.find(r=>r.id==="acomp");
+    if(pac.idade&&+pac.idade<60)notaAcomp=`O prontuário cita acompanhante, mas o paciente tem ${pac.idade} anos: a diária de acompanhante de idoso não se aplica (confira se cabe outra, como a de gestante ou de pessoa com deficiência).`;
+    else if(admD&&altaD&&altaD>admD){
+      const c={regra:R,dias:{},provas:acompProvas,confianca:"media",observacao:`Acompanhante registrado no prontuário: 1 diária por pernoite, de ${_fmt(admD).slice(0,5)} a ${_fmt(_maisDias(altaD,-1)).slice(0,5)}${pac.idade?"":". Confirme se o paciente tem 60 anos ou mais"}`};
+      for(let d=new Date(admD);d<altaD;d=_maisDias(d,1))c.dias[_fmt(d)]=1;
+      contagem.set("acomp",c);
+    }else notaAcomp="O prontuário cita acompanhante, mas faltam as datas de entrada e saída para calcular a diária de acompanhante de idoso. Informe a quantidade no espelho.";
+  }
   const fases={};
   if(admD&&altaD)for(let d=new Date(admD);d<=altaD;d=_maisDias(d,1)){
     const k=_fmt(d); const uti=contagem.get("uti");
     fases[k]=uti&&uti.dias[k]?"uti":(utiIni&&d<utiIni&&viaPA)?"pa":(!utiIni&&viaPA&&+d===+admD)?"pa":"enf";
   }
-  const ordem=["uti","vmi","iot","cvc","cur2","o2","pcr","tc","rx","hemoc","hemog","gaso","ecg","neb","svd","sng","pa","glic","im","ev","cur1"];
+  const ordem=["uti","acomp","vmi","iot","cvc","cur2","o2","pcr","tc","rx","hemoc","hemog","gaso","ecg","neb","svd","sng","pa","glic","im","ev","cur1","cons_enf","cons_soc","cons_nut"];
   const paginasDe=pv=>{const ps=[...new Set(pv.map(p=>p.pag))].sort((a,b)=>a-b);const fx=[];for(const p of ps){const u=fx[fx.length-1];if(u&&p===u[1]+1)u[1]=p;else fx.push([p,p])}return "Pág. "+fx.map(([a,b])=>a===b?a:`${a}–${b}`).join(", ")};
   const procedimentos=[...contagem.values()].sort((a,b)=>ordem.indexOf(a.regra.id)-ordem.indexOf(b.regra.id)).map(c=>({
     codigo:c.regra.codigo,descricao:c.regra.nome,regra:c.regra.id,dias:c.dias,fonte:paginasDe(c.provas),confianca:c.confianca||c.regra.confianca||"alta",observacao:c.observacao||c.regra.nota||null,provas:c.provas
@@ -198,7 +258,7 @@ function lerProntuario(paginas){
   const cidPrinc=cidsAlta[0]||cids.filter(c=>c.tipo==="atualizado")[0]||cids[0]||null;
   if(cidPrinc){cids.forEach(c=>{if(c!==cidPrinc&&c.tipo==="atualizado")c.tipo="secundario"});cidPrinc.tipo="alta"}
   const diagnosticos=cids.sort((a,b)=>(a===cidPrinc?-1:b===cidPrinc?1:a.ordem-b.ordem)).map(({ordem,ordemAlta,...c})=>c);
-  const principal=procPrincipalPorCid(cidPrinc&&cidPrinc.cid);
+  const principal=princLaudo||procPrincipalPorCid(cidPrinc&&cidPrinc.cid);
 
   // Pontos de atenção
   const alertas=[];
@@ -209,6 +269,7 @@ function lerProntuario(paginas){
   if(entrada&&cidPrinc&&entrada.cid!==cidPrinc.cid)alertas.push(`O diagnóstico mudou de ${entrada.cid} para ${cidsAlta.filter(c=>c.tipo!=="entrada").map(c=>c.cid).join(" / ")||cidPrinc.cid}. O procedimento principal sugerido segue o diagnóstico de alta.`);
   if(!cidPrinc)alertas.push("Nenhum CID foi encontrado no prontuário. Informe o CID principal antes de lançar.");
   if(!principal&&cidPrinc)alertas.push(`Não há regra de procedimento principal para o CID ${cidPrinc.cid}. Escolha o procedimento principal na tabela SIGTAP.`);
+  if(notaAcomp)alertas.push(notaAcomp);
   if(!altaD)alertas.push("A data de alta ou óbito não foi encontrada. Confira o desfecho da internação.");
   alertas.push(...totaisInformados);
   if(admD&&altaD){const fora=new Set();procedimentos.forEach(p=>Object.keys(p.dias).forEach(k=>{const d=_data(...k.split("/"));if(d<admD||d>altaD)fora.add(k)}));if(fora.size)alertas.push(`Há procedimentos com data fora da internação: ${[...fora].join(", ")}.`)}
@@ -242,4 +303,4 @@ function lerProntuario(paginas){
     paginas:paginas.length,ms
   };
 }
-if(typeof module!=="undefined")module.exports={lerProntuario,REGRAS};
+if(typeof module!=="undefined")module.exports={lerProntuario,REGRAS,REGRAS_LINHA};

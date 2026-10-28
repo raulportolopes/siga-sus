@@ -27,7 +27,7 @@ function montaProntuario(id,origem,arquivo,paginas,msExtra){
   p.procedimentos.forEach(x=>{x.conferido=false;x.qtdManual=null});
   const pp=p.principal&&sigtapIndex.get(p.principal.codigo); const perm=permanencia(p);
   if(pp&&pp.perm&&perm!=null&&perm>2*pp.perm)p.alertas.splice(1,0,`A permanência (${perm} diárias) passou do dobro da média do procedimento principal (${pp.perm} dias). Pode caber diária de permanência a maior (08.02.01.019-9).`);
-  if(p.principal&&p.principal.codigo)p.procedimentos.unshift({codigo:p.principal.codigo,descricao:p.principal.descricao,dias:{},fonte:"Diagnóstico de alta",confianca:"media",observacao:`Sugerido pelo CID ${p.diagnosticos[0]?p.diagnosticos[0].cid:""}. Confira a compatibilidade CID × procedimento.`,principal:true,conferido:false,qtdManual:null,qtdFixa:1,provas:[]});
+  if(p.principal&&p.principal.codigo)p.procedimentos.unshift({codigo:p.principal.codigo,descricao:p.principal.descricao,dias:{},fonte:p.principal.origem==="laudo"?`Pág. ${p.principal.pag}`:"Diagnóstico de alta",confianca:p.principal.origem==="laudo"?"alta":"media",observacao:p.principal.origem==="laudo"?`Lido no laudo da AIH (página ${p.principal.pag}).`:`Sugerido pelo CID ${p.diagnosticos[0]?p.diagnosticos[0].cid:""}. Confira a compatibilidade CID × procedimento.`,principal:true,conferido:false,qtdManual:null,qtdFixa:1,provas:[]});
   return p;
 }
 
@@ -122,7 +122,7 @@ function renderResultado(){
     </div>
     <div class="pac-aih">
       <div class="aih-tit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 3h6v4H9zM5 5h4M15 5h4v16H5V5"/><path d="M9 13l2 2 4-4"/></svg>Dados para a AIH</div>
-      <div class="aih-linha"><small>Procedimento principal sugerido</small><span>${p.principal?`<span class="mono" style="color:var(--azul)">${fmtCod(p.principal.codigo)}</span> ${esc(nomePrinc)}`:"Não identificado. Escolha na tabela SIGTAP."}</span></div>
+      <div class="aih-linha"><small>Procedimento principal ${p.principal&&p.principal.origem==="laudo"?"(do laudo da AIH)":"sugerido"}</small><span>${p.principal?`<span class="mono" style="color:var(--azul)">${fmtCod(p.principal.codigo)}</span> ${esc(nomePrinc)}`:"Não identificado. Escolha na tabela SIGTAP."}</span></div>
       <div class="aih-linha"><small>CID principal e secundários</small>
         <div class="cids">${cidPrinc?`<span class="cid principal"><b>${esc(cidPrinc.cid)}</b>${esc(cidPrinc.descricao)}</span>`:"—"}${outros.map(d=>`<span class="cid"><b>${esc(d.cid)}</b>${esc(d.descricao)}</span>`).join("")}</div>
       </div>
@@ -138,6 +138,8 @@ function renderResultado(){
   </section>
 
   ${p.alertas&&p.alertas.length?`<section class="alertas"><h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>Pontos para conferir antes de lançar</h3><ul>${p.alertas.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></section>`:""}
+
+  ${S.amostras&&S.amostras[p.id]?`<section class="amostra-box"><p><b>O leitor deixou algo de fora?</b> Gere uma amostra deste prontuário <b>sem os dados do paciente</b> (nomes, documentos e números apagados, datas deslocadas). Confira o texto e mande para a equipe do SIGA-SUS ajustar o leitor a este modelo.</p><button class="btn pri" id="bt-amostra">Gerar amostra sem dados do paciente</button><div id="amostra-saida"></div></section>`:""}
 
   <section class="painel">
     <div class="painel-cab" style="padding-bottom:0;border-bottom:0">
@@ -221,6 +223,7 @@ function ligaResultado(p){
   document.querySelectorAll("[data-mais]").forEach(b=>b.onclick=()=>{S.lim[b.dataset.mais]=lim(b.dataset.mais)+PASSO;remonta()});
   document.querySelectorAll(".chk").forEach(c=>c.onchange=()=>{p.procedimentos[+c.dataset.i].conferido=c.checked;renderResultado()});
   document.querySelectorAll(".qtd").forEach(c=>c.onchange=()=>{const x=p.procedimentos[+c.dataset.i];const v=Math.max(0,Math.round(+c.value||0));x.qtdManual=v===qtdIA(x)?null:v;renderResultado();const n=$("#qtd-"+c.dataset.i);n&&n.focus()});
+  ligaAmostra(S.amostras&&S.amostras[p.id]);
   $("#bt-todos").onclick=()=>{p.procedimentos.forEach(x=>x.conferido=true);renderResultado();toast("Todas as linhas marcadas como conferidas")};
   $("#bt-copiar").onclick=()=>copiarMV(p);
   $("#bt-csv").onclick=()=>exportarCSV(p);
@@ -274,9 +277,12 @@ function mostraProgresso(etapa,detalhe,erro){
     <ol class="etapas">${ETAPAS.map((t,i)=>`<li class="${i<etapa?"feita":i===etapa&&!erro?"ativa":""}"><span class="m"></span>${t}${i===etapa&&detalhe&&!erro?` <span style="color:var(--ink-3);font-weight:500">· ${esc(detalhe)}</span>`:""}</li>`).join("")}</ol>
     ${erro?`<div class="msg erro">${esc(erro)}</div>`:""}
     ${erro&&S.amostra?`<div class="amostra-box"><p>Para o leitor aprender este modelo, gere uma amostra do texto <b>sem os dados do paciente</b>: nomes, documentos e números são apagados e as datas mudam. Confira o texto e mande para a equipe do SIGA-SUS.</p><button class="btn pri" id="bt-amostra">Gerar amostra sem dados do paciente</button><div id="amostra-saida"></div></div>`:""}</div>`;
+  ligaAmostra(S.amostra);
+}
+function ligaAmostra(dados){
   const bt=$("#bt-amostra");
-  if(bt)bt.onclick=()=>{
-    const txt=amostraAnonima(S.amostra.paginas,S.amostra.arquivo,S.amostra.nOcr);
+  if(bt&&dados)bt.onclick=()=>{
+    const txt=amostraAnonima(dados.paginas,dados.arquivo,dados.nOcr);
     $("#amostra-saida").innerHTML=`<textarea class="amostra-txt" readonly rows="12" aria-label="Amostra sem dados do paciente">${esc(txt)}</textarea><div class="pc-botoes"><button class="btn" id="bt-amostra-copiar">Copiar texto</button><button class="btn pri" id="bt-amostra-baixar">Baixar arquivo</button></div>`;
     $("#bt-amostra-baixar").onclick=()=>baixaTexto(txt,"amostra_sem_dados_do_paciente.txt");
     $("#bt-amostra-copiar").onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast("Amostra copiada")}catch(e){const a=$(".amostra-txt");a.focus();a.select();toast("Texto selecionado: copie com Ctrl+C")}};
@@ -421,8 +427,11 @@ const _vog=s=>s.replace(/[aáàâã]/gi,"[aáàâã]").replace(/[eéê]/gi,"[eé
 const NAO_NOME=new Set("DAS DOS DATA NASC NASCIMENTO SEXO IDADE ANOS LEITO CNS CPF REGISTRO ATENDIMENTO CONVENIO CONVÊNIO SUS MASCULINO FEMININO PRONTUARIO PRONTUÁRIO ENTRADA INTERNACAO INTERNAÇÃO SETOR CLINICA CLÍNICA MEDICA MÉDICA ENFERMARIA UTI HORA NOME MAE MÃE PAI SOCIAL COMPLETO RESPONSAVEL RESPONSÁVEL ACOMPANHANTE PACIENTE HOSPITAL PDF COPIA CÓPIA SCAN DIGITALIZADO".split(" "));
 function amostraAnonima(paginas,arquivo,nOcr){
   const n=paginas.length,idx=new Set();
-  for(let i=0;i<Math.min(6,n);i++)idx.add(i);
-  for(let k=1;k<=14&&n>6;k++)idx.add(Math.min(n-1,Math.round(5+(n-6)*k/14)));
+  for(let i=0;i<Math.min(5,n);i++)idx.add(i);
+  const ASSUNTO=/glic|HGT|dextro|nutri|social|enfermag|enfermeir|acompanhante|\bCID|diagn[óo]stic|laudo|procedimento|alta\b|[óo]bito/i;
+  const comAssunto=[];for(let i=5;i<n;i++)if(ASSUNTO.test(paginas[i]))comAssunto.push(i);
+  for(let k=0;k<16&&k<comAssunto.length;k++)idx.add(comAssunto[Math.floor(k*comAssunto.length/Math.min(16,comAssunto.length))]);
+  for(let k=1;idx.size<30&&k<=30&&n>5;k++)idx.add(Math.min(n-1,Math.round(4+(n-5)*k/30)));
   const nomes=new Set();
   const junta=s=>String(s).split(/[^A-Za-zÀ-ú]+/).forEach(w=>{const u=w.toUpperCase();if(w.length>=3&&!NAO_NOME.has(u))nomes.add(u)});
   junta(String(arquivo).replace(/\.pdf$/i,""));
@@ -435,8 +444,9 @@ function amostraAnonima(paginas,arquivo,nOcr){
     t=String(t)
       .replace(/\b(CPF|CNS|CART[ÃA]O\s+(?:SUS|NACIONAL)[^:\n]{0,12}|RG|N[º°o]?\.?\s*(?:DO\s+)?PRONTU[ÁA]RIO|PRONTU[ÁA]RIO|ATENDIMENTO|REGISTRO(?:\s+GERAL)?(?:\s*\(RG\))?|MATR[ÍI]CULA|TELEFONE|FONE|CELULAR|ENDERE[ÇC]O|LOGRADOURO|BAIRRO|CEP|CIDADE|MUNIC[ÍI]PIO|NATURALIDADE|E-?MAIL|DATA\s+DE\s+NASC\w*|DT\.?\s*NASC\w*|NASCIMENTO|IDADE|PROFISS[ÃA]O|ESTADO\s+CIVIL)\s*:\s*[^\n|]{1,70}?(?=\s{2,}|\s+\||\||\n|$|\s+[A-ZÀ-Ú][A-ZÀ-Ú.\/ ]{1,25}:)/gi,"$1: [OCULTO]")
       .replace(/\b(Assinad[oa](?:\s+eletronicamente)?\s+por|Profissional|Prescrit[oa]\s+por|Checad[oa]\s+por|Executad[oa]\s+por|Realizad[oa]\s+por|Solicitante|Usu[áa]rio)\s*:?\s*[^\n|]{2,60}?(?=\s+-\s+|\s{2,}|\||\n|$)/gi,"$1: [PROFISSIONAL]")
-      .replace(/\b(Dr\.?|Dra\.?|Enf[ªa]?\.?|Enfermeir[oa]|T[ée]c\.?|T[ée]cnic[oa](?:\s+de\s+enfermagem)?|Aux\.?|Auxiliar)\s+((?:[A-ZÀ-Ú][\wÀ-ú]+)(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ú][\wÀ-ú]+){0,3})/g,"$1 [PROFISSIONAL]")
-      .replace(/\b(CRM|COREN|CRF|CRN|CREFITO|CRP|CRO)\b[^\n\d]{0,12}[\d.\-\/]+/gi,"$1 [NÚMERO]")
+      .replace(/\b(Dr\.?|Dra\.?|Enf[ªa]?\.?|Enfermeir[oa]|T[ée]c\.?|T[ée]cnic[oa](?:\s+de\s+enfermagem)?|Aux\.?|Auxiliar|Nutricionista|Assistente\s+[Ss]ocial|Psic[óo]log[oa]|Fisioterapeuta|Fonoaudi[óo]log[oa]|Farmac[êe]utic[oa]|M[ée]dic[oa])\s+(?:-\s+)?((?:[A-ZÀ-Ú][\wÀ-ú]+)(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ú][\wÀ-ú]+){0,3})/g,"$1 [PROFISSIONAL]")
+      .replace(/\b(CRM|COREN|CRF|CRN|CREFITO|CRP|CRO|CRESS|CRFa)\b[^\n\d]{0,12}[\d.\-\/]+/gi,"$1 [NÚMERO]")
+      .replace(/\[PROFISSIONAL\](?:-?\d{0,2})\s+\d{3,}/g,"[PROFISSIONAL] [NÚMERO]")
       .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[EMAIL]")
       .replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/g,(x,d,m,a)=>mudaData(d,m,a)||x)
       .replace(/\d{3}\.\d{3}\.\d{3}-\d{2}/g,"[NÚMERO]")
@@ -484,7 +494,7 @@ async function analisar(arquivo){
     etapa=4;
     if(p.procedimentos.filter(x=>!x.principal).length===0)throw new Error(`Não encontrei procedimentos no padrão conhecido${nOcr?` (li ${paginas.length} folhas, ${nOcr} delas por reconhecimento de texto)`:""}. Este modelo de prontuário ainda não está nas regras do leitor.`);
     await tela.termina();tela.fecha();
-    S.prontuarios.push(p);S.aba="espelho";
+    S.prontuarios.push(p);S.aba="espelho";S.amostras={[p.id]:{paginas,arquivo:arquivo.name,nOcr}};
     const st=copia?await Promise.race([copia,pausa(50).then(()=>null)]):undefined;
     toast(st===true?"Prontuário lido e cópia guardada.":st===false?"Prontuário lido. A cópia não pôde ser guardada.":grande?`Prontuário lido. O PDF tem ${mb(arquivo.size)}, grande demais para guardar cópia.`:"Prontuário lido. Confira o espelho.");
     if(st===null)copia.then(ok=>toast(ok?"Cópia do prontuário guardada.":"A cópia não pôde ser guardada."));
@@ -507,9 +517,9 @@ function renderSigtap(){
   const lista=S.sigtap.filter(s=>{if(!q)return true;if(qd&&/^[\d.\-\s]+$/.test(q))return s.codigo.startsWith(qd);const nome=s.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return palavras.every(w=>nome.includes(w))});
   $("#tb-sigtap").innerHTML=lista.slice(0,200).map(s=>`<tr><td class="mono num" style="white-space:nowrap">${fmtCod(s.codigo)}</td><td>${esc(s.nome)}</td><td class="r num">${BRL.format(s.sh)}</td><td class="r num">${BRL.format(s.sp)}</td><td class="r num">${BRL.format(s.sa)}</td></tr>`).join("")||`<tr><td colspan="5" class="vazio">Nenhum procedimento encontrado.</td></tr>`;
   $("#rodape-sigtap").textContent=lista.length>200?`Mostrando 200 de ${lista.length.toLocaleString("pt-BR")} procedimentos. Refine a busca.`:`${lista.length.toLocaleString("pt-BR")} procedimento(s)`;
-  const PALAVRAS={pa:["pressão arterial"],glic:["glicemia capilar","HGT","dextro"],im:["intramuscular","via IM"],ev:["aplicação/administração de medicação endovenosa"],pcr:["RT-PCR","swab nasofaríngeo"],cur2:["curativo complexo","curativo especial","curativo grau II"],cur1:["curativo simples"],o2:["oxigenoterapia","O2","cateter nasal","máscara de reservatório/Venturi"],iot:["intubação","IOT"],vmi:["ventilação mecânica","VMI"],cvc:["cateter venoso central","CVC","+ passagem/inserção/instalado"],hemog:["hemograma"],rx:["raio-X","radiografia"],hemoc:["hemocultura"],neb:["nebulização","inalação"],ecg:["eletrocardiograma","ECG"],gaso:["gasometria"],tc:["tomografia"],svd:["sonda vesical","SVD"],sng:["sonda nasogástrica/nasoenteral","SNG","SNE"]};
-  const IGNORA={pcr:"resultado, liberado, positivo, negativo",o2:"ar ambiente, suspensa, retirada",iot:"extubação",vmi:"desmame, suspensa",cvc:"curativo, retirado, sítio",hemog:"resultado",rx:"resultado, laudo",hemoc:"resultado",ecg:"resultado, laudo",gaso:"resultado",tc:"resultado, laudo",svd:"retirada",sng:"retirada"};
-  $("#tb-regras").innerHTML=[...REGRAS,REGRA_UTI].map(r=>{const s=r.codigo&&sigtapIndex.get(r.codigo);return `<tr><td class="proc-nome">${esc(r.nome)}</td><td class="mono num" style="white-space:nowrap">${r.codigo?fmtCod(r.codigo):"sem código"}${s?`<div class="proc-sub" style="font-family:var(--f-body)">${esc(s.nome)}</div>`:""}</td><td>${r.tipo==="diaria"?'<span class="conf media">1 por dia</span>':'<span class="conf alta">soma cada registro</span>'}</td><td class="regra-pal">${PALAVRAS[r.id]?esc(PALAVRAS[r.id].join(" · ")):"período entre a transferência para a UTI e a saída"}${IGNORA[r.id]?`<br><span style="color:var(--erro)">ignora quando tem: ${esc(IGNORA[r.id])}</span>`:""}</td></tr>`}).join("");
+  const PALAVRAS={pa:["pressão arterial"],glic:["glicemia capilar","glicemia com valor (Glicemia: 132)","HGT","dextro","glicosimetria"],cons_enf:["consulta/evolução de enfermagem","evolução do enfermeiro","histórico de enfermagem","SAE"],cons_soc:["serviço social","assistente social","CRESS"],cons_nut:["nutricionista","evolução/avaliação nutricional","CRN"],acomp:["acompanhante","acompanhado pela/por"],im:["intramuscular","via IM"],ev:["aplicação/administração de medicação endovenosa"],pcr:["RT-PCR","swab nasofaríngeo"],cur2:["curativo complexo","curativo especial","curativo grau II"],cur1:["curativo simples"],o2:["oxigenoterapia","O2","cateter nasal","máscara de reservatório/Venturi"],iot:["intubação","IOT"],vmi:["ventilação mecânica","VMI"],cvc:["cateter venoso central","CVC","+ passagem/inserção/instalado"],hemog:["hemograma"],rx:["raio-X","radiografia"],hemoc:["hemocultura"],neb:["nebulização","inalação"],ecg:["eletrocardiograma","ECG"],gaso:["gasometria"],tc:["tomografia"],svd:["sonda vesical","SVD"],sng:["sonda nasogástrica/nasoenteral","SNG","SNE"]};
+  const IGNORA={glic:"jejum, sérica, glicada",cons_enf:"técnico, auxiliar",acomp:"sem acompanhante, desacompanhado",pcr:"resultado, liberado, positivo, negativo",o2:"ar ambiente, suspensa, retirada",iot:"extubação",vmi:"desmame, suspensa",cvc:"curativo, retirado, sítio",hemog:"resultado",rx:"resultado, laudo",hemoc:"resultado",ecg:"resultado, laudo",gaso:"resultado",tc:"resultado, laudo",svd:"retirada",sng:"retirada"};
+  $("#tb-regras").innerHTML=[...REGRAS,...REGRAS_LINHA,REGRA_UTI].map(r=>{const s=r.codigo&&sigtapIndex.get(r.codigo);return `<tr><td class="proc-nome">${esc(r.nome)}</td><td class="mono num" style="white-space:nowrap">${r.codigo?fmtCod(r.codigo):"sem código"}${s?`<div class="proc-sub" style="font-family:var(--f-body)">${esc(s.nome)}</div>`:""}</td><td>${r.tipo==="diaria"?'<span class="conf media">1 por dia</span>':r.tipo==="atendimento"?'<span class="conf media">1 por folha e dia</span>':r.tipo==="acompanhante"?'<span class="conf media">1 por pernoite (60 anos ou mais)</span>':'<span class="conf alta">soma cada registro</span>'}${r.nota&&r.tipo==="atendimento"?`<div class="proc-sub">${esc(r.nota)}</div>`:""}</td><td class="regra-pal">${PALAVRAS[r.id]?esc(PALAVRAS[r.id].join(" · ")):"período entre a transferência para a UTI e a saída"}${IGNORA[r.id]?`<br><span style="color:var(--erro)">ignora quando tem: ${esc(IGNORA[r.id])}</span>`:""}</td></tr>`}).join("");
 }
 $("#busca-sigtap").addEventListener("input",renderSigtap);
 $("#restaurar-sigtap").onclick=()=>{S.sigtap=SIGTAP_OFICIAL;S.sigtapFonte="oficial";S.sigtapInfo=SIGTAP_INFO_OFICIAL;S.competencia=SIGTAP_DADOS.competencia;try{localStorage.removeItem("sigasus_sigtap_v2")}catch(e){}indexaSigtap();renderSigtap();toast("Voltou para a tabela "+SIGTAP_DADOS.competencia)};

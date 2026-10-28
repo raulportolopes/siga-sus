@@ -18,6 +18,7 @@ Abra o `index.html` no navegador e envie os PDFs de `fonte/ficticios/`. Totais e
 | 02_lucia | R$ 2.094,40 |
 | 03_roberto_obito | R$ 2.599,51 (desfecho Óbito) |
 | 04_francisca_alertas | R$ 582,42, com alerta de folha 04 faltando e total de O2 diferente |
+| 05_mv (modelo MV: laudo da AIH, evoluções em texto) | R$ 308,62: estafilococcias pelo laudo, 2 diárias de acompanhante, 8 glicemias, consultas 2 enfermagem + 2 serviço social + 3 nutrição |
 
 Os exemplos de `fonte/exemplos/` (Maria e José) também aparecem no próprio site e não podem mudar de resultado sem motivo.
 
