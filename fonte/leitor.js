@@ -14,13 +14,14 @@ const REGRAS = [
   {id:"iot",   codigo:null, nome:"Intubação orotraqueal", tipo:"contagem", nota:"Sem código próprio no SIGTAP: entra na diária de UTI", padrao:/intuba[cç][aã]o|\bIOT\b/i, excluir:/extuba/i},
   {id:"vmi",   codigo:null, nome:"Ventilação mecânica invasiva", tipo:"diaria", nota:"Sem código próprio no SIGTAP: entra na diária de UTI", padrao:/ventila[cç][aã]o mec[aâ]nica|\bVMI\b/i, excluir:/desmame|suspens/i},
   {id:"cvc",   codigo:"0702040150", nome:"Cateter venoso central", tipo:"contagem", nota:"OPM: confirme se é mono ou duplo lúmen", confianca:"media", padrao:/cateter venoso central|\bCVC\b/i, exigir:/passagem|inser[cç][aã]o d[eo] cateter|puncionad|instalad|realizad/i, excluir:/curativo|retirad|s[ií]tio/i},
-  {id:"hemog", codigo:"0202020380", nome:"Hemograma completo", tipo:"contagem", padrao:/hemograma/i, excluir:/resultado/i},
-  {id:"rx",    codigo:"0204030153", nome:"Raio-X de tórax", tipo:"contagem", padrao:/raio[\s-]?x|radiografia/i, excluir:/resultado|laudo/i},
-  {id:"hemoc", codigo:"0202080153", nome:"Hemocultura", tipo:"contagem", padrao:/hemocultura/i, excluir:/resultado/i},
+  {id:"hemog", codigo:"0202020380", nome:"Hemograma completo", tipo:"contagem", padrao:/hemograma/i, excluir:/resultado|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
+  {id:"rx",    codigo:"0204030153", nome:"Raio-X de tórax", tipo:"contagem", padrao:/(raio[\s-]?x|radiografia|\bRX\b)(?![^.;|]{0,40}(cr[âa]nio|abdome|bacia|joelho|coluna|m[ãa]o|p[ée]\b|ombro|f[êe]mur|perna|bra[çc]o|seios|quadril))/i, excluir:/resultado|laudo|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
+  {id:"hemoc", codigo:"0202080153", nome:"Hemocultura", tipo:"contagem", padrao:/hemocultura/i, excluir:/resultado|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
   {id:"neb",   codigo:"0301100101", nome:"Nebulização", tipo:"contagem", padrao:/nebuliza[cç]|inala[cç][aã]o/i},
-  {id:"ecg",   codigo:"0211020036", nome:"Eletrocardiograma", tipo:"contagem", padrao:/eletrocardiograma|\bECG\b/i, excluir:/resultado|laudo/i},
-  {id:"gaso",  codigo:"0202010732", nome:"Gasometria", tipo:"contagem", padrao:/gasometria/i, excluir:/resultado/i},
-  {id:"tc",    codigo:"0206020031", nome:"Tomografia de tórax", tipo:"contagem", padrao:/tomografia/i, excluir:/resultado|laudo/i},
+  {id:"ecg",   codigo:"0211020036", nome:"Eletrocardiograma", tipo:"contagem", padrao:/eletrocardiograma|\bECG\b/i, excluir:/resultado|laudo|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
+  {id:"gaso",  codigo:"0202010732", nome:"Gasometria", tipo:"contagem", padrao:/gasometria/i, excluir:/resultado|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
+  {id:"tc",    codigo:"0206020031", nome:"Tomografia de tórax", tipo:"contagem", padrao:/(tomografia|\bTC\b)[^.;|]{0,30}t[óo]rax/i, excluir:/resultado|laudo|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
+  {id:"tc2",   codigo:null, nome:"Tomografia de outra região", tipo:"contagem", nota:"O código depende da região (crânio, abdome etc.): escolha na tabela SIGTAP", confianca:"media", padrao:/tomografia(?![^.;|]{0,30}t[óo]rax)/i, excluir:/resultado|laudo|solicit|pedid[oa]|a\s+pedir|agendad|aguard|programad|suspens|cancelad/i},
   {id:"svd",   codigo:"0301100055", nome:"Sondagem vesical", tipo:"contagem", padrao:/sonda(gem)?\s+vesical|\bSVD\b/i, excluir:/retirad/i},
   {id:"sng",   codigo:"0301100179", nome:"Sondagem nasogástrica", tipo:"contagem", padrao:/sonda(gem)?\s+naso(g[aá]strica|enteral)|\bSN[GE]\b/i, excluir:/retirad/i}
 ];
@@ -250,7 +251,7 @@ function lerProntuario(paginas){
     const k=_fmt(d); const uti=contagem.get("uti");
     fases[k]=uti&&uti.dias[k]?"uti":(utiIni&&d<utiIni&&viaPA)?"pa":(!utiIni&&viaPA&&+d===+admD)?"pa":"enf";
   }
-  const ordem=["uti","acomp","vmi","iot","cvc","cur2","o2","pcr","tc","rx","hemoc","hemog","gaso","ecg","neb","svd","sng","pa","glic","im","ev","cur1","cons_enf","cons_soc","cons_nut"];
+  const ordem=["uti","acomp","vmi","iot","cvc","cur2","o2","pcr","tc","tc2","rx","hemoc","hemog","gaso","ecg","neb","svd","sng","pa","glic","im","ev","cur1","cons_enf","cons_soc","cons_nut"];
   const paginasDe=pv=>{const ps=[...new Set(pv.map(p=>p.pag))].sort((a,b)=>a-b);const fx=[];for(const p of ps){const u=fx[fx.length-1];if(u&&p===u[1]+1)u[1]=p;else fx.push([p,p])}return "Pág. "+fx.map(([a,b])=>a===b?a:`${a}–${b}`).join(", ")};
   const procedimentos=[...contagem.values()].sort((a,b)=>ordem.indexOf(a.regra.id)-ordem.indexOf(b.regra.id)).map(c=>({
     codigo:c.regra.codigo,descricao:c.regra.nome,regra:c.regra.id,dias:c.dias,fonte:paginasDe(c.provas),confianca:c.confianca||c.regra.confianca||"alta",observacao:c.observacao||c.regra.nota||null,provas:c.provas
