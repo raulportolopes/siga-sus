@@ -260,6 +260,32 @@ td.trecho{color:var(--ink);min-width:260px;line-height:1.35}
 .nota-valor{flex-basis:100%;font-size:12.5px;color:var(--ink-3)}
 .sem-valor{display:inline-block;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;cursor:help;white-space:nowrap}
 .sem-valor-motivo{color:var(--ink-2);margin-top:2px}
+.carregando{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:grid;place-items:center;padding:16px;background:rgba(7,29,65,.58);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:carr-in .18s ease-out}
+.carregando[hidden]{display:none}
+body.lendo{overflow:hidden}
+.carr-card{width:100%;max-width:440px;background:var(--surface);color:var(--ink);border-radius:18px;padding:30px 26px 24px;box-shadow:0 20px 60px rgba(7,29,65,.35);text-align:center;position:relative;overflow:hidden}
+.carr-card::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,var(--verde) 0 33.3%,var(--amarelo) 33.3% 66.6%,var(--azul) 66.6%)}
+.carr-doc{position:relative;width:72px;height:88px;margin:0 auto 16px;border-radius:12px;background:var(--azul-suave);color:var(--azul);display:grid;place-items:center;overflow:hidden}
+.carr-doc svg{width:40px;height:48px}
+.carr-scan{position:absolute;left:9px;right:9px;top:12px;height:3px;border-radius:2px;background:var(--verde);box-shadow:0 0 10px var(--verde);animation:carr-scan 1.1s ease-in-out infinite alternate}
+.carr-card h2{font-family:var(--f-display);font-size:22px;font-weight:800;margin:0 0 4px}
+.carr-arq{margin:0 0 18px;color:var(--ink-3);font-size:14px;overflow-wrap:anywhere}
+.carr-barra{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.carr-barra i{display:block;height:100%;width:0;border-radius:inherit;background:var(--azul)}
+.carr-det{display:flex;justify-content:space-between;gap:12px;margin-top:7px;font-size:13px;color:var(--ink-3);min-height:1.3em}
+.carr-det b{color:var(--azul);font-weight:700}
+.carr-etapas{list-style:none;margin:18px 0 0;padding:0;text-align:left;display:grid;gap:10px;font-size:14.5px;color:var(--ink-3)}
+.carr-etapas li{display:flex;align-items:center;gap:10px}
+.carr-etapas .m{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;box-sizing:border-box}
+.carr-etapas li.ativa{color:var(--ink);font-weight:600}
+.carr-etapas li.ativa .m{border-color:var(--azul);border-top-color:transparent;animation:carr-gira .7s linear infinite}
+.carr-etapas li.feita{color:var(--ink-2)}
+.carr-etapas li.feita .m{border-color:var(--verde);background:var(--verde)}
+.carr-etapas li.feita .m::after{content:"";width:4px;height:8px;border:solid var(--surface);border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+@keyframes carr-in{from{opacity:0}to{opacity:1}}
+@keyframes carr-scan{to{top:calc(100% - 15px)}}
+@keyframes carr-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.carregando,.carr-scan,.carr-etapas li.ativa .m{animation:none}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--azul-escuro);color:#fff;padding:11px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:20;box-shadow:var(--shadow);max-width:calc(100vw - 32px)}
 :root[data-theme="dark"] .toast{background:#E5ECF6;color:#071D41}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .toast{background:#E5ECF6;color:#071D41}}
@@ -939,6 +965,34 @@ function mostraProgresso(etapa,detalhe,erro){
     ${erro?`<div class="msg erro">${esc(erro)}</div>`:""}</div>`;
 }
 const pausa=ms=>new Promise(r=>setTimeout(r,ms));
+/* Tela "Lendo o seu prontuário": fica no mínimo DUR_LEITURA ms, mesmo quando a leitura termina antes */
+const DUR_LEITURA=3800;
+function abreCarregando(nome){
+  let el=$("#carregando");
+  if(!el){el=document.createElement("div");el.id="carregando";el.className="carregando";el.setAttribute("role","status");el.setAttribute("aria-live","polite");document.body.appendChild(el)}
+  el.innerHTML=`<div class="carr-card">
+    <div class="carr-doc" aria-hidden="true"><svg viewBox="0 0 40 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M25 3H8a4 4 0 0 0-4 4v34a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4V14z"/><path d="M25 3v11h11"/><path d="M12 24h16M12 31h16M12 38h9"/></svg><i class="carr-scan"></i></div>
+    <h2>Lendo o seu prontuário</h2>
+    <p class="carr-arq">${esc(nome)}</p>
+    <div class="carr-barra"><i></i></div>
+    <div class="carr-det"><span></span><b class="num">0%</b></div>
+    <ol class="carr-etapas">${ETAPAS.map(t=>`<li><span class="m"></span>${t}</li>`).join("")}</ol>
+  </div>`;
+  el.hidden=false;document.body.classList.add("lendo");
+  const t0=performance.now(),barra=el.querySelector(".carr-barra i"),pct=el.querySelector(".carr-det b"),det=el.querySelector(".carr-det span"),lis=[...el.querySelectorAll(".carr-etapas li")];
+  let pronto=false,aberto=true;
+  (function quadro(){if(!aberto)return;
+    const f=pronto?1:Math.min(.94,(performance.now()-t0)/DUR_LEITURA);
+    const et=pronto?ETAPAS.length:Math.min(ETAPAS.length-1,Math.floor(f/.94*ETAPAS.length));
+    barra.style.width=(f*100).toFixed(1)+"%";pct.textContent=Math.round(f*100)+"%";
+    lis.forEach((li,i)=>li.className=i<et?"feita":i===et?"ativa":"");
+    requestAnimationFrame(quadro)})();
+  return {
+    detalhe:t=>{det.textContent=t},
+    termina:async()=>{await pausa(Math.max(0,DUR_LEITURA-(performance.now()-t0)));pronto=true;det.textContent="Pronto";await pausa(300)},
+    fecha:()=>{aberto=false;el.hidden=true;document.body.classList.remove("lendo")}
+  };
+}
 async function extraiPDF(arquivo,onPagina){
   if(!window.pdfjsLib)throw new Error("O leitor de PDF não carregou. Confira a internet e recarregue a página.");
   const pdf=await pdfjsLib.getDocument({data:await arquivo.arrayBuffer()}).promise;
@@ -955,23 +1009,25 @@ async function extraiPDF(arquivo,onPagina){
 async function analisar(arquivo){
   if(!/\.pdf$/i.test(arquivo.name)&&arquivo.type!=="application/pdf"){toast("Envie um arquivo PDF");return}
   ir("nova");
-  $("#progresso-box").dataset.arquivo=arquivo.name;
+  $("#progresso-box").dataset.arquivo=arquivo.name;$("#progresso-box").hidden=true;
+  const tela=abreCarregando(arquivo.name);
   const t0=performance.now();
   let etapa=0;
   try{
-    mostraProgresso(0);await pausa(150);
-    etapa=1;mostraProgresso(1);
-    const paginas=await extraiPDF(arquivo,(i,n)=>mostraProgresso(1,`folha ${i} de ${n}`));
+    etapa=1;
+    const paginas=await extraiPDF(arquivo,(i,n)=>tela.detalhe(`Folha ${i} de ${n}`));
+    tela.detalhe(paginas.length===1?"1 folha":`${paginas.length} folhas`);
     const letras=paginas.join("").replace(/\s/g,"").length;
     if(letras/paginas.length<40)throw new Error("Este PDF é só imagem (folhas escaneadas) e não tem texto para ler. Ele precisa passar por OCR, o reconhecimento de texto, antes. Isso entra numa próxima etapa do projeto.");
-    etapa=2;mostraProgresso(2);await pausa(150);
+    etapa=2;
     const p=montaProntuario("pdf"+Date.now(),"envio",arquivo.name,paginas,performance.now()-t0);
-    etapa=3;mostraProgresso(3);await pausa(150);
-    etapa=4;mostraProgresso(4);await pausa(150);
+    etapa=4;
     if(p.procedimentos.filter(x=>!x.principal).length===0)throw new Error("Não encontrei procedimentos no padrão conhecido. Confira se é um prontuário de internação ou mande um exemplo deste modelo para ajustarmos as regras.");
-    S.prontuarios.push(p);S.aba="espelho";$("#progresso-box").hidden=true;
+    await tela.termina();tela.fecha();
+    S.prontuarios.push(p);S.aba="espelho";
     toast("Prontuário lido. Confira o espelho.");ir("resultado",p.id);
   }catch(e){
+    tela.fecha();
     mostraProgresso(etapa,"",e&&e.message?e.message:"Não foi possível ler este PDF. Tente de novo.");
   }
 }
