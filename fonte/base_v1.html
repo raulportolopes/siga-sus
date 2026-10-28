@@ -1,0 +1,945 @@
+<title>ProntuAI Faturamento SUS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: barra institucional azul-escura + faixa tricolor, menu lateral fixo, área de trabalho em painéis brancos sobre fundo azulado */
+:root{
+  --bg:#EEF3F9; --surface:#FFFFFF; --surface-2:#E8EFF8; --surface-3:#F6F9FD;
+  --ink:#0E2240; --ink-2:#4A5B75; --ink-3:#71819A; --line:#D3DDEA;
+  --azul:#1351B4; --azul-hover:#0C3F92; --azul-suave:#DCE8FA; --azul-escuro:#071D41;
+  --verde:#168821; --verde-bg:#E1F3DF; --amarelo:#FFCD07;
+  --alerta-bg:#FFF4D1; --alerta-ink:#5E4500; --alerta-line:#F1D27A;
+  --erro:#C4161C; --erro-bg:#FDE7E7;
+  --header-bg:#071D41; --header-ink:#FFFFFF; --header-ink-2:#A9BCDB;
+  --shadow:0 1px 2px rgba(7,29,65,.06),0 4px 14px rgba(7,29,65,.06);
+  --f-display:"Raleway","Segoe UI",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0A1322; --surface:#101C30; --surface-2:#172742; --surface-3:#0D182A;
+  --ink:#E5ECF6; --ink-2:#A3B4CC; --ink-3:#7C8DA8; --line:#23365A;
+  --azul:#5D9CFF; --azul-hover:#86B4FF; --azul-suave:#1A3260; --azul-escuro:#050E1F;
+  --verde:#52C45E; --verde-bg:#123018; --amarelo:#FFD43B;
+  --alerta-bg:#33290A; --alerta-ink:#FFE19A; --alerta-line:#6B5713;
+  --erro:#FF7A7A; --erro-bg:#3A1416;
+  --header-bg:#050E1F; --header-ink:#FFFFFF; --header-ink-2:#8FA5C8;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A1322; --surface:#101C30; --surface-2:#172742; --surface-3:#0D182A;
+  --ink:#E5ECF6; --ink-2:#A3B4CC; --ink-3:#7C8DA8; --line:#23365A;
+  --azul:#5D9CFF; --azul-hover:#86B4FF; --azul-suave:#1A3260; --azul-escuro:#050E1F;
+  --verde:#52C45E; --verde-bg:#123018; --amarelo:#FFD43B;
+  --alerta-bg:#33290A; --alerta-ink:#FFE19A; --alerta-line:#6B5713;
+  --erro:#FF7A7A; --erro-bg:#3A1416;
+  --header-bg:#050E1F; --header-ink:#FFFFFF; --header-ink-2:#8FA5C8;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--header-bg)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;font-variant-numeric:lining-nums}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--amarelo);outline-offset:2px;border-radius:4px}
+.num{font-variant-numeric:lining-nums tabular-nums}
+.mono{font-family:var(--f-mono);font-size:.86em;letter-spacing:.01em}
+
+/* Cabeçalho */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--header-bg);color:var(--header-ink)}
+.top-in{display:flex;align-items:center;gap:16px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.marca{display:flex;align-items:center;gap:10px;min-width:0}
+.marca svg{flex:none}
+.marca b{font-family:var(--f-display);font-weight:800;font-size:19px;letter-spacing:.01em}
+.marca small{display:block;color:var(--header-ink-2);font-size:12.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-dir{margin-left:auto;display:flex;align-items:center;gap:14px}
+.unidade{font-size:13px;color:var(--header-ink-2);text-align:right;line-height:1.25}
+.unidade b{color:var(--header-ink);font-weight:600;display:block}
+.avatar{width:34px;height:34px;border-radius:50%;background:#1351B4;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none;border:2px solid rgba(255,255,255,.25)}
+.faixa{height:4px;background:linear-gradient(90deg,#168821 0 33.3%,#FFCD07 33.3% 66.6%,#1351B4 66.6%)}
+
+/* Estrutura */
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:calc(100vh - 64px)}
+.menu{background:var(--surface);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:18px}
+.menu h4{margin:0 10px 6px;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--ink-2);font-weight:600}
+.nav button:hover{background:var(--surface-2);color:var(--ink)}
+.nav button[aria-current="true"]{background:var(--azul-suave);color:var(--azul)}
+.nav svg{flex:none}
+.pac-item{display:flex;flex-direction:column;align-items:flex-start!important;gap:0!important}
+.pac-item span{font-weight:600;color:var(--ink);line-height:1.25}
+.pac-item small{font-weight:500;color:var(--ink-3);font-size:12.5px}
+.menu-rodape{margin-top:auto;padding:12px;border-radius:10px;background:var(--verde-bg);color:var(--ink);font-size:13px;line-height:1.4}
+.menu-rodape b{color:var(--verde);display:flex;gap:6px;align-items:center;margin-bottom:2px}
+
+.main{min-width:0;padding-block:22px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.view[hidden]{display:none!important}
+
+.migalha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink-3);font-size:13.5px}
+.migalha b{color:var(--ink-2);font-weight:600}
+.selo{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
+.selo.ia{background:var(--azul-suave);color:var(--azul)}
+.selo.ok{background:var(--verde-bg);color:var(--verde)}
+.selo.aviso{background:var(--alerta-bg);color:var(--alerta-ink)}
+
+.painel{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.painel-cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line)}
+.painel-cab h3{font-size:16px;font-weight:700}
+.painel-corpo{padding:18px}
+
+/* Paciente */
+.paciente{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);overflow:hidden}
+.pac-esq{padding:20px 22px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.pac-nome{font-size:clamp(22px,3vw,28px);font-weight:800;letter-spacing:-.01em;line-height:1.15}
+.ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 18px;margin:0}
+.ficha div{min-width:0}
+.ficha dt{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);font-weight:700}
+.ficha dd{margin:0;font-weight:600;font-variant-numeric:lining-nums tabular-nums}
+.pac-aih{background:var(--surface-3);border-left:1px solid var(--line);padding:20px 22px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.aih-tit{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--azul)}
+.aih-linha{display:flex;flex-direction:column;gap:2px}
+.aih-linha small{color:var(--ink-3);font-size:12.5px;font-weight:600}
+.aih-linha span{font-weight:600;line-height:1.3}
+.cids{display:flex;gap:6px;flex-wrap:wrap}
+.cid{display:inline-flex;gap:6px;align-items:baseline;padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--line);font-size:13px}
+.cid b{font-family:var(--f-mono);font-weight:500;color:var(--azul)}
+.cid.principal{border-color:var(--azul);background:var(--azul-suave)}
+
+/* Indicadores */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.kpi{padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi small{font-size:12.5px;color:var(--ink-2);font-weight:600}
+.kpi strong{font-family:var(--f-display);font-size:26px;font-weight:800;font-variant-numeric:lining-nums tabular-nums;line-height:1.15}
+.kpi span{font-size:12.5px;color:var(--ink-3)}
+.kpi.destaque{background:var(--azul);border-color:var(--azul);color:#fff}
+.kpi.destaque small,.kpi.destaque span{color:rgba(255,255,255,.82)}
+:root[data-theme="dark"] .kpi.destaque{color:#06132A}
+:root[data-theme="dark"] .kpi.destaque small,:root[data-theme="dark"] .kpi.destaque span{color:rgba(6,19,42,.78)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .kpi.destaque{color:#06132A}:root:not([data-theme="light"]) .kpi.destaque small,:root:not([data-theme="light"]) .kpi.destaque span{color:rgba(6,19,42,.78)}}
+
+/* Alertas */
+.alertas{background:var(--alerta-bg);border:1px solid var(--alerta-line);border-radius:12px;padding:14px 18px;color:var(--alerta-ink)}
+.alertas h3{font-size:14.5px;display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.alertas ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px}
+
+/* Abas */
+.abas{display:flex;gap:4px;padding:6px 8px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+.abas button{border:0;background:none;padding:10px 14px;font-weight:700;color:var(--ink-2);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.abas button[aria-selected="true"]{color:var(--azul);border-bottom-color:var(--azul)}
+.abas button:hover{color:var(--ink)}
+.aba{padding:0}
+.aba[hidden]{display:none!important}
+.acoes{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:999px;font-weight:700;font-size:14px;cursor:pointer;color:var(--azul)}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--azul);border-color:var(--azul);color:#fff}
+.btn.pri:hover{background:var(--azul-hover)}
+:root[data-theme="dark"] .btn.pri{color:#06132A}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.pri{color:#06132A}}
+.btn.perigo{color:var(--erro)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Tabelas */
+.tabela-rola{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface-3);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:hover td{background:var(--surface-3)}
+tr.conferido td{background:color-mix(in srgb,var(--verde-bg) 60%,transparent)}
+td.r,th.r{text-align:right}
+td.c,th.c{text-align:center}
+.proc-nome{font-weight:600;line-height:1.3}
+.proc-sub{font-size:12.5px;color:var(--ink-3)}
+.tag-principal{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--azul);background:var(--azul-suave);padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:1px}
+.qtd{width:68px;text-align:right;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font-variant-numeric:tabular-nums;font-weight:700}
+.qtd.alterada{border-color:var(--amarelo);background:var(--alerta-bg)}
+.conf{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px}
+.conf.alta{background:var(--verde-bg);color:var(--verde)}
+.conf.media{background:var(--alerta-bg);color:var(--alerta-ink)}
+.conf.baixa{background:var(--erro-bg);color:var(--erro)}
+.chk{width:18px;height:18px;accent-color:var(--verde);cursor:pointer}
+tfoot td{font-weight:800;background:var(--surface-3);border-bottom:0}
+.rodape-tab{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 18px;color:var(--ink-2);font-size:13.5px}
+.barra{flex:1;min-width:140px;height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.barra i{display:block;height:100%;background:var(--verde);transition:width .3s}
+
+/* Mapa diário */
+.mapa th.dia{text-align:center;padding:8px 6px;line-height:1.15}
+.mapa th.dia small{display:block;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--ink-3)}
+.mapa td{padding:6px;text-align:center}
+.mapa td:first-child,.mapa th:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;min-width:200px;max-width:240px;padding-left:14px}
+.mapa thead th:first-child{background:var(--surface-3)}
+.cel{display:inline-grid;place-items:center;min-width:30px;height:28px;border-radius:6px;font-weight:700;font-variant-numeric:tabular-nums;font-size:13.5px}
+.cel.zero{color:var(--line)}
+.mapa .tot{font-weight:800;background:var(--surface-3)}
+.legenda{display:flex;gap:16px;flex-wrap:wrap;padding:12px 18px;font-size:13px;color:var(--ink-2)}
+.fase{font-size:10.5px;font-weight:800;letter-spacing:.05em;color:#fff;border-radius:3px;padding:0 4px;display:inline-block;margin-top:3px}
+.fase.uti{background:var(--erro)}
+.fase.pa{background:var(--azul)}
+.fase.enf{background:var(--verde)}
+
+/* Linha do tempo */
+.tempo{list-style:none;margin:0;padding:18px 18px 18px 22px;display:flex;flex-direction:column}
+.tempo li{display:grid;grid-template-columns:96px 22px minmax(0,1fr);gap:0 12px;position:relative;padding-bottom:16px}
+.tempo li::before{content:"";position:absolute;left:calc(96px + 12px + 10px);top:22px;bottom:-2px;width:2px;background:var(--line)}
+.tempo li:last-child::before{display:none}
+.tempo .quando{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;line-height:1.25;padding-top:1px}
+.tempo .quando small{display:block;color:var(--ink-3);font-weight:600}
+.tempo .ponto{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);border:2px solid var(--surface);box-shadow:0 0 0 2px var(--line);z-index:1}
+.tempo .ponto i{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.tempo .t-admissao i,.tempo .t-alta i{background:var(--verde)}
+.tempo .t-diagnostico i,.tempo .t-intercorrencia i{background:var(--erro)}
+.tempo .t-exame i{background:var(--amarelo)}
+.tempo .t-procedimento i,.tempo .t-transferencia i{background:var(--azul)}
+.tempo .tipo{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.tempo p{margin:1px 0 0}
+
+.resumo{padding:20px 22px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px}
+.resumo p{margin:0;max-width:66ch;font-size:16px;line-height:1.6}
+.diag-evol{display:flex;flex-direction:column;gap:10px}
+.diag-evol div{display:flex;gap:10px;align-items:flex-start}
+.diag-evol b{font-family:var(--f-mono);font-weight:500;color:var(--azul);min-width:46px}
+
+/* Nova análise */
+.drop{border:2px dashed color-mix(in srgb,var(--azul) 45%,var(--line));border-radius:14px;background:var(--surface);padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;cursor:pointer;transition:background .15s,border-color .15s}
+.drop:hover,.drop.sobre{background:var(--azul-suave);border-color:var(--azul)}
+.drop h2{font-size:21px;font-weight:800}
+.drop p{margin:0;color:var(--ink-2);max-width:56ch}
+.drop .icone{width:58px;height:58px;border-radius:14px;background:var(--azul-suave);display:grid;place-items:center;color:var(--azul)}
+.passos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.passo{padding:16px;display:flex;gap:12px;align-items:flex-start}
+.passo .n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--azul);color:#fff;display:grid;place-items:center;font-weight:800;font-family:var(--f-display);font-size:14px}
+:root[data-theme="dark"] .passo .n{color:#06132A}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .passo .n{color:#06132A}}
+.passo b{display:block;margin-bottom:2px}
+.passo p{margin:0;color:var(--ink-2);font-size:14px}
+.exemplos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.exemplo{padding:16px 18px;display:flex;gap:14px;align-items:center;text-align:left;cursor:pointer;width:100%;color:var(--ink)}
+.exemplo:hover{border-color:var(--azul)}
+.exemplo .doc{flex:none;width:42px;height:52px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--erro);font-size:10px;font-weight:800}
+.exemplo b{display:block}
+.exemplo small{color:var(--ink-3)}
+.progresso{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.etapas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.etapas li{display:flex;gap:10px;align-items:center;color:var(--ink-3)}
+.etapas li .m{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center}
+.etapas li.ativa{color:var(--ink);font-weight:600}
+.etapas li.ativa .m{border-color:var(--azul);border-top-color:transparent;animation:gira .8s linear infinite}
+.etapas li.feita{color:var(--ink-2)}
+.etapas li.feita .m{background:var(--verde);border-color:var(--verde)}
+.etapas li.feita .m::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+@keyframes gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.etapas li.ativa .m{animation:none;border-top-color:var(--azul)}}
+.msg{padding:12px 16px;border-radius:10px;font-size:14.5px}
+.msg.erro{background:var(--erro-bg);color:var(--erro)}
+.msg.info{background:var(--azul-suave);color:var(--ink)}
+
+/* SIGTAP */
+.aviso-sigtap{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;border-radius:12px;background:var(--alerta-bg);border:1px solid var(--alerta-line);color:var(--alerta-ink)}
+.aviso-sigtap.ok{background:var(--verde-bg);border-color:color-mix(in srgb,var(--verde) 40%,transparent);color:var(--ink)}
+.aviso-sigtap p{margin:0}
+.busca{flex:1;min-width:200px;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface-3)}
+.sobre-txt{padding:22px;display:flex;flex-direction:column;gap:12px;max-width:72ch}
+.sobre-txt p{margin:0}
+.sobre-txt h3{font-size:17px;margin-top:6px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--azul-escuro);color:#fff;padding:11px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:20;box-shadow:var(--shadow);max-width:calc(100vw - 32px)}
+:root[data-theme="dark"] .toast{background:#E5ECF6;color:#071D41}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .toast{background:#E5ECF6;color:#071D41}}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.vazio{padding:28px;text-align:center;color:var(--ink-3)}
+
+@media (max-width:980px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .paciente,.resumo{grid-template-columns:minmax(0,1fr)}
+  .pac-aih{border-left:0;border-top:1px solid var(--line)}
+}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .menu{border-right:0;border-bottom:1px solid var(--line);padding:10px max(12px,env(safe-area-inset-left,0px));flex-direction:row;overflow-x:auto;gap:6px}
+  .menu h4,.menu-rodape,.menu .sep{display:none}
+  .nav{flex-direction:row;gap:4px}
+  .nav button{white-space:nowrap;padding:8px 10px}
+  .pac-item small{display:none}
+  .unidade{display:none}
+  .passos,.exemplos{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:460px){
+  .kpi strong{font-size:22px}
+  .tempo li{grid-template-columns:70px 22px minmax(0,1fr)}
+  .tempo li::before{left:calc(70px + 12px + 10px)}
+  .marca small{display:none}
+}
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="marca">
+      <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><rect width="38" height="38" rx="10" fill="#1351B4"/><path d="M15 8h8v7h7v8h-7v7h-8v-7H8v-8h7z" fill="#fff"/><path d="M15 23h8v7h-8z" fill="#168821"/><circle cx="29.5" cy="8.5" r="3.5" fill="#FFCD07"/></svg>
+      <div><b>ProntuAI</b><small>Faturamento hospitalar SUS · AIH</small></div>
+    </div>
+    <div class="top-dir">
+      <div class="unidade">Setor de Faturamento · Internação<b>Hospital Municipal (demonstração)</b></div>
+      <div class="avatar" title="Faturista">FT</div>
+    </div>
+  </div>
+  <div class="faixa"></div>
+</header>
+
+<div class="app">
+  <nav class="menu" aria-label="Menu principal">
+    <div>
+      <h4>Faturamento</h4>
+      <div class="nav">
+        <button id="nav-nova" data-view="nova">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 12v6M9 15h6"/></svg>
+          Ler prontuário
+        </button>
+      </div>
+    </div>
+    <div>
+      <h4>Prontuários da sessão</h4>
+      <div class="nav" id="lista-pac"></div>
+    </div>
+    <div>
+      <h4>Cadastros</h4>
+      <div class="nav">
+        <button id="nav-sigtap" data-view="sigtap">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+          Tabela SIGTAP
+        </button>
+        <button id="nav-lgpd" data-view="lgpd">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          Privacidade (LGPD)
+        </button>
+      </div>
+    </div>
+    <div class="menu-rodape">
+      <b><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Nada fica gravado</b>
+      Os prontuários ficam só na memória desta tela. Ao fechar, tudo é descartado.
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- RESULTADO -->
+    <section class="view wrap" id="view-resultado" aria-live="polite"></section>
+
+    <!-- NOVA ANÁLISE -->
+    <section class="view wrap" id="view-nova" hidden>
+      <div class="migalha"><b>Faturamento</b> / Ler prontuário</div>
+      <label class="drop" id="drop" for="arquivo">
+        <div class="icone"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+        <h2>Envie o prontuário digitalizado</h2>
+        <p>Arraste o PDF que veio do SAME ou clique para escolher. A IA lê todas as folhas, conta cada procedimento por dia e monta o espelho da AIH com os códigos SIGTAP.</p>
+        <span class="btn pri">Escolher PDF</span>
+        <input type="file" id="arquivo" accept="application/pdf,.pdf" hidden>
+      </label>
+      <div id="progresso-box" hidden></div>
+      <div class="passos">
+        <div class="painel passo"><span class="n">1</span><div><b>Envie o PDF</b><p>Prontuário de alta ou óbito, já escaneado pelo SAME. Pode ter centenas de folhas.</p></div></div>
+        <div class="painel passo"><span class="n">2</span><div><b>A IA lê e soma</b><p>Cada aferição, injeção, exame e diária é contada por dia, como o rascunho no papel.</p></div></div>
+        <div class="painel passo"><span class="n">3</span><div><b>Confira e lance no MV</b><p>Marque o que conferiu, ajuste quantidades e copie o espelho pronto.</p></div></div>
+      </div>
+      <div class="painel">
+        <div class="painel-cab"><h3>Prontuários de exemplo</h3><span class="selo">já processados</span></div>
+        <div class="painel-corpo exemplos" id="exemplos"></div>
+      </div>
+    </section>
+
+    <!-- SIGTAP -->
+    <section class="view wrap" id="view-sigtap" hidden>
+      <div class="migalha"><b>Cadastros</b> / Tabela SIGTAP</div>
+      <div id="sigtap-aviso"></div>
+      <div class="painel">
+        <div class="painel-cab">
+          <h3>Procedimentos</h3>
+          <input class="busca" id="busca-sigtap" type="search" placeholder="Buscar por código ou nome">
+          <label class="btn pri" for="arq-sigtap" style="cursor:pointer">Importar tabela</label>
+          <input type="file" id="arq-sigtap" accept=".txt,.csv,text/plain,text/csv" hidden>
+          <button class="btn" id="restaurar-sigtap" hidden>Voltar ao exemplo</button>
+        </div>
+        <div class="tabela-rola"><table><thead><tr><th>Código</th><th>Procedimento</th><th class="r">Valor</th></tr></thead><tbody id="tb-sigtap"></tbody></table></div>
+        <div class="rodape-tab" id="rodape-sigtap"></div>
+      </div>
+    </section>
+
+    <!-- LGPD -->
+    <section class="view wrap" id="view-lgpd" hidden>
+      <div class="migalha"><b>Cadastros</b> / Privacidade (LGPD)</div>
+      <div class="painel sobre-txt">
+        <h2 style="font-size:22px">Como os dados do paciente são tratados</h2>
+        <p>O PDF é aberto dentro do seu navegador. O texto das folhas é enviado para a leitura pela IA e o resultado volta para esta tela. Nenhum arquivo, texto ou resultado é gravado em servidor deste sistema.</p>
+        <p>Os prontuários aparecem na lista "Prontuários da sessão" apenas enquanto a tela estiver aberta. O botão "Descartar" apaga um prontuário na hora, e fechar a página apaga todos.</p>
+        <h3>O que fica salvo</h3>
+        <p>Só a tabela SIGTAP importada, que é pública, fica guardada neste navegador para não precisar importar de novo.</p>
+        <h3>Responsabilidade do faturista</h3>
+        <p>A IA faz a contagem e sugere os códigos. A conferência e o lançamento no sistema de faturamento continuam com o faturista, que marca cada linha conferida antes de exportar.</p>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+"use strict";
+/* ============ Tabela SIGTAP de exemplo (substituir pela oficial) ============ */
+const SIGTAP_EXEMPLO = [
+  ["0303010223","TRATAMENTO DE INFECÇÃO PELO NOVO CORONAVÍRUS – COVID-19",1500.00],
+  ["0303140151","TRATAMENTO DE PNEUMONIAS OU INFLUENZA (GRIPE)",504.89],
+  ["0802010083","DIÁRIA DE UNIDADE DE TERAPIA INTENSIVA ADULTO (UTI II)",600.00],
+  ["0301060010","VENTILAÇÃO MECÂNICA INVASIVA (POR DIA)",40.00],
+  ["0301060029","INTUBAÇÃO OROTRAQUEAL",50.00],
+  ["0309060046","CATETERISMO VENOSO CENTRAL",45.00],
+  ["0301100195","OXIGENOTERAPIA (POR DIA)",12.00],
+  ["0301100039","AFERIÇÃO DE PRESSÃO ARTERIAL",0.63],
+  ["0214010015","GLICEMIA CAPILAR",1.85],
+  ["0301100020","ADMINISTRAÇÃO DE MEDICAMENTO POR VIA INTRAMUSCULAR",0.63],
+  ["0301100101","INALAÇÃO / NEBULIZAÇÃO",0.63],
+  ["0213010372","PESQUISA DE SARS-COV-2 POR RT-PCR",96.00],
+  ["0401010015","CURATIVO GRAU II COM OU SEM DEBRIDAMENTO",31.59],
+  ["0301100284","CURATIVO SIMPLES",3.00],
+  ["0202020380","HEMOGRAMA COMPLETO",4.11],
+  ["0204030153","RADIOGRAFIA DE TÓRAX (PA E PERFIL)",9.50],
+  ["0202080080","HEMOCULTURA",11.49],
+  ["0202010473","DOSAGEM DE GLICOSE",1.85],
+  ["0202010317","DOSAGEM DE CREATININA",1.85],
+  ["0202010694","DOSAGEM DE UREIA",1.85],
+  ["0202010635","DOSAGEM DE SÓDIO",1.85],
+  ["0202010600","DOSAGEM DE POTÁSSIO",1.85],
+  ["0202020029","CONTAGEM DE PLAQUETAS",2.73],
+  ["0202010210","GASOMETRIA",15.65],
+  ["0211020036","ELETROCARDIOGRAMA",5.15],
+  ["0206020031","TOMOGRAFIA COMPUTADORIZADA DE TÓRAX",136.41],
+  ["0301100047","ADMINISTRAÇÃO DE MEDICAMENTO POR VIA ENDOVENOSA",0.63],
+  ["0301100250","SONDAGEM VESICAL DE DEMORA",3.00],
+  ["0301100217","SONDAGEM NASOGÁSTRICA",3.00],
+  ["0802010199","DIÁRIA DE PERMANÊNCIA A MAIOR",41.00]
+].map(([codigo,nome,valor])=>({codigo,nome,valor}));
+
+/* ============ Prontuários de exemplo (já processados) ============ */
+const EXEMPLOS = [
+{
+  id:"ex1", origem:"exemplo", arquivo:"prontuario paciente 2.pdf", paginas:4, folhas:"Folhas 01 a 22", tempoLeitura:"48 s",
+  paciente:{nome:"Maria das Graças Silva",registro:"852963-Y",leito:"208-UTI",nascimento:"05/03/1962",idade:64},
+  internacao:{admissao:"10/07/2026",alta:"21/07/2026",desfecho:"Alta hospitalar",medicos:["Dr. Fernando Rocha · CRM/SP 135790","Dra. Camila Siqueira · CRM/SP 246810"]},
+  diagnosticos:[
+    {cid:"J11.1",descricao:"Síndrome gripal não especificada",data:"10/07/2026",tipo:"entrada"},
+    {cid:"U07.1",descricao:"COVID-19, vírus identificado",data:"13/07/2026",tipo:"alta"},
+    {cid:"B34.2",descricao:"Infecção por coronavírus",data:"13/07/2026",tipo:"alta"}
+  ],
+  principal:{codigo:"0303010223",descricao:"Tratamento de infecção pelo novo coronavírus – COVID-19"},
+  fases:{"10/07/2026":"pa","11/07/2026":"pa","12/07/2026":"pa","13/07/2026":"uti","14/07/2026":"uti","15/07/2026":"uti","16/07/2026":"uti","17/07/2026":"uti","18/07/2026":"uti","19/07/2026":"uti","20/07/2026":"enf","21/07/2026":"enf"},
+  procedimentos:[
+    {codigo:"0802010083",descricao:"Diária de UTI adulto",dias:{"13/07/2026":1,"14/07/2026":1,"15/07/2026":1,"16/07/2026":1,"17/07/2026":1,"18/07/2026":1,"19/07/2026":1},fonte:"Folhas 08–22",confianca:"media",observacao:"Inferida pelo período em UTI (13/07 a 19/07)"},
+    {codigo:"0301060010",descricao:"Ventilação mecânica invasiva",dias:{"13/07/2026":1,"14/07/2026":1,"15/07/2026":1,"16/07/2026":1,"17/07/2026":1,"18/07/2026":1},fonte:"Folha 08",confianca:"alta",observacao:"6 diárias registradas"},
+    {codigo:"0301060029",descricao:"Intubação orotraqueal",dias:{"13/07/2026":1},fonte:"Folha 08",confianca:"alta"},
+    {codigo:"0309060046",descricao:"Cateter venoso central (subclávia E)",dias:{"13/07/2026":1},fonte:"Folha 08",confianca:"alta"},
+    {codigo:"0401010015",descricao:"Curativo grau II (CVC e tubo)",dias:{"13/07/2026":1,"14/07/2026":1,"15/07/2026":1,"16/07/2026":1,"17/07/2026":1,"18/07/2026":1},fonte:"Folhas 08–22",confianca:"alta"},
+    {codigo:"0301100195",descricao:"Oxigenoterapia",dias:{"12/07/2026":1,"19/07/2026":1,"20/07/2026":1},fonte:"Folha 06 e pág. 3",confianca:"alta",observacao:"Máscara com reservatório em 12/07; cateter nasal em 19 e 20/07"},
+    {codigo:"0213010372",descricao:"RT-PCR para SARS-CoV-2",dias:{"10/07/2026":1},fonte:"Folha 02",confianca:"alta",observacao:"Coleta em 10/07, resultado positivo em 12/07"},
+    {codigo:"0301100039",descricao:"Aferição de pressão arterial",dias:{"10/07/2026":2,"11/07/2026":2,"12/07/2026":2,"13/07/2026":6,"14/07/2026":6,"15/07/2026":6,"16/07/2026":6,"17/07/2026":6,"18/07/2026":6,"19/07/2026":4,"20/07/2026":1},fonte:"Folhas 02–22 e pág. 3",confianca:"alta"},
+    {codigo:"0214010015",descricao:"Glicemia capilar",dias:{"10/07/2026":2,"11/07/2026":2,"12/07/2026":1,"13/07/2026":4,"14/07/2026":4,"15/07/2026":4,"16/07/2026":4,"17/07/2026":3,"18/07/2026":3,"19/07/2026":2,"20/07/2026":1},fonte:"Folhas 02–22 e pág. 3",confianca:"alta"},
+    {codigo:"0301100020",descricao:"Medicação intramuscular",dias:{"10/07/2026":1,"11/07/2026":1,"20/07/2026":1},fonte:"Folhas 02, 03 e pág. 3",confianca:"alta"},
+    {codigo:"0301100284",descricao:"Curativo simples",dias:{"11/07/2026":1,"20/07/2026":1},fonte:"Folha 03 e pág. 3",confianca:"alta"}
+  ],
+  eventos:[
+    {data:"10/07/2026",hora:"10:15",tipo:"admissao",texto:"Admissão no Pronto Atendimento com quadro gripal há 4 dias e falta de ar. Diagnóstico de entrada J11.1."},
+    {data:"10/07/2026",hora:"11:30",tipo:"exame",texto:"Coleta de swab nasofaríngeo para RT-PCR (painel viral)."},
+    {data:"12/07/2026",hora:"08:30",tipo:"exame",texto:"RT-PCR positivo para SARS-CoV-2."},
+    {data:"12/07/2026",hora:"09:00",tipo:"intercorrencia",texto:"Dessaturação (SpO2 88%) e taquipneia. Oxigenoterapia por máscara com reservatório a 10 L/min."},
+    {data:"13/07/2026",hora:"03:00",tipo:"diagnostico",texto:"SDRA grave por COVID-19. Diagnóstico atualizado para U07.1 / B34.2 e transferência para UTI."},
+    {data:"13/07/2026",hora:"03:30",tipo:"procedimento",texto:"Intubação orotraqueal e início de ventilação mecânica invasiva."},
+    {data:"13/07/2026",hora:"04:15",tipo:"procedimento",texto:"Cateter venoso central em veia subclávia esquerda."},
+    {data:"19/07/2026",hora:"09:00",tipo:"procedimento",texto:"Extubação após desmame ventilatório. Oxigênio por cateter nasal."},
+    {data:"20/07/2026",hora:"",tipo:"transferencia",texto:"Transferida para enfermaria. Retirado o cateter venoso central."},
+    {data:"21/07/2026",hora:"10:00",tipo:"alta",texto:"Alta hospitalar estável, em ar ambiente, no 12º dia de internação."}
+  ],
+  resumo:"Paciente de 64 anos internada em 10/07/2026 com síndrome gripal (J11.1). O RT-PCR saiu positivo para SARS-CoV-2 em 12/07, com piora respiratória e início de oxigenoterapia. Em 13/07 evoluiu com SDRA grave, foi intubada e transferida para a UTI, onde ficou 6 dias em ventilação mecânica com cateter venoso central. Foi extubada em 19/07, passou para a enfermaria em 20/07 e recebeu alta estável em 21/07/2026.",
+  alertas:[
+    "A folha 07 não aparece no prontuário digitalizado: o registro pula da folha 06 para a 08. Vale pedir a folha ao SAME.",
+    "A diária de UTI foi inferida pelo período de 13/07 a 19/07. Confirme a data exata de saída da UTI.",
+    "O diagnóstico mudou de J11.1 para U07.1 / B34.2 em 13/07. O procedimento principal sugerido segue o diagnóstico de alta.",
+    "No dia 12/07 há só 1 glicemia capilar registrada, contra 2 nos dias anteriores."
+  ]
+},
+{
+  id:"ex2", origem:"exemplo", arquivo:"prontuario_jose_moreira.pdf", paginas:14, folhas:"Folhas 01 a 14", tempoLeitura:"36 s",
+  paciente:{nome:"José Aparecido Moreira",registro:"774120-K",leito:"112-ENF B",nascimento:"22/11/1954",idade:71},
+  internacao:{admissao:"03/08/2026",alta:"08/08/2026",desfecho:"Alta hospitalar",medicos:["Dra. Patrícia Nunes · CRM/SP 198432"]},
+  diagnosticos:[
+    {cid:"J18.9",descricao:"Pneumonia não especificada",data:"03/08/2026",tipo:"alta"},
+    {cid:"I10",descricao:"Hipertensão essencial",data:"03/08/2026",tipo:"secundario"},
+    {cid:"E11.9",descricao:"Diabetes mellitus tipo 2 sem complicações",data:"03/08/2026",tipo:"secundario"}
+  ],
+  principal:{codigo:"0303140151",descricao:"Tratamento de pneumonias ou influenza (gripe)"},
+  fases:{"03/08/2026":"pa","04/08/2026":"enf","05/08/2026":"enf","06/08/2026":"enf","07/08/2026":"enf","08/08/2026":"enf"},
+  procedimentos:[
+    {codigo:"0301100195",descricao:"Oxigenoterapia (cateter nasal)",dias:{"03/08/2026":1,"04/08/2026":1,"05/08/2026":1},fonte:"Folhas 03–06",confianca:"alta"},
+    {codigo:"0202080080",descricao:"Hemocultura",dias:{"03/08/2026":2},fonte:"Folha 02",confianca:"media",observacao:"2 amostras na mesma coleta"},
+    {codigo:"0204030153",descricao:"Raio-X de tórax (PA e perfil)",dias:{"03/08/2026":1,"07/08/2026":1},fonte:"Folhas 02 e 12",confianca:"alta"},
+    {codigo:"0202020380",descricao:"Hemograma completo",dias:{"03/08/2026":1,"05/08/2026":1},fonte:"Folhas 02 e 07",confianca:"alta"},
+    {codigo:"0301100101",descricao:"Nebulização",dias:{"03/08/2026":3,"04/08/2026":3,"05/08/2026":2,"06/08/2026":2,"07/08/2026":1},fonte:"Folhas 03–12",confianca:"alta"},
+    {codigo:"0301100039",descricao:"Aferição de pressão arterial",dias:{"03/08/2026":4,"04/08/2026":4,"05/08/2026":4,"06/08/2026":3,"07/08/2026":3,"08/08/2026":2},fonte:"Folhas 03–13",confianca:"alta"},
+    {codigo:"0214010015",descricao:"Glicemia capilar",dias:{"03/08/2026":3,"04/08/2026":3,"05/08/2026":3,"06/08/2026":2,"07/08/2026":2,"08/08/2026":1},fonte:"Folhas 03–13",confianca:"alta"},
+    {codigo:"0301100020",descricao:"Medicação intramuscular",dias:{"03/08/2026":1,"04/08/2026":1},fonte:"Folhas 03 e 05",confianca:"alta"},
+    {codigo:"0301100284",descricao:"Curativo simples",dias:{"05/08/2026":1},fonte:"Folha 07",confianca:"alta"}
+  ],
+  eventos:[
+    {data:"03/08/2026",hora:"08:40",tipo:"admissao",texto:"Admissão pelo PA com febre, tosse produtiva e falta de ar. Raio-X com consolidação em base direita. Diagnóstico J18.9."},
+    {data:"03/08/2026",hora:"10:00",tipo:"exame",texto:"Coleta de hemograma e 2 hemoculturas; raio-X de tórax."},
+    {data:"03/08/2026",hora:"11:00",tipo:"procedimento",texto:"Início de antibiótico endovenoso, oxigênio por cateter nasal a 2 L/min e nebulizações."},
+    {data:"04/08/2026",hora:"07:00",tipo:"transferencia",texto:"Transferido do PA para a enfermaria clínica."},
+    {data:"05/08/2026",hora:"09:00",tipo:"exame",texto:"Hemograma de controle com queda dos leucócitos."},
+    {data:"06/08/2026",hora:"",tipo:"procedimento",texto:"Oxigênio suspenso; saturação de 95% em ar ambiente."},
+    {data:"07/08/2026",hora:"08:00",tipo:"exame",texto:"Raio-X de controle com melhora da consolidação."},
+    {data:"08/08/2026",hora:"11:00",tipo:"alta",texto:"Alta com antibiótico oral e retorno na UBS em 7 dias."}
+  ],
+  resumo:"Paciente de 71 anos, hipertenso e diabético, internado em 03/08/2026 com pneumonia comunitária (J18.9). Recebeu antibiótico endovenoso, oxigênio por cateter nasal por 3 dias e nebulizações. Hemograma e raio-X de controle mostraram melhora, e ele recebeu alta em 08/08/2026 com antibiótico oral.",
+  alertas:[
+    "Foram coletadas 2 hemoculturas em 03/08. Confirme se o laboratório lançou como 2 exames.",
+    "Antibiótico endovenoso aparece na prescrição. Medicamentos não entram neste espelho de procedimentos.",
+    "A glicemia de 08/08 está sem horário na folha 13."
+  ]
+}
+];
+
+/* ============ Estado ============ */
+const S = {
+  prontuarios: EXEMPLOS.map(p=>prepara(structuredClone(p))),
+  atual:"ex1", view:"resultado", aba:"espelho",
+  sigtap: SIGTAP_EXEMPLO, sigtapFonte:"exemplo", sigtapInfo:""
+};
+function prepara(p){
+  p.procedimentos.forEach(x=>{x.conferido=false;x.qtdManual=null});
+  if(p.principal && p.principal.codigo){
+    p.procedimentos.unshift({codigo:p.principal.codigo,descricao:p.principal.descricao,dias:{},fonte:"Diagnóstico de alta",confianca:"alta",principal:true,conferido:false,qtdManual:null,qtdFixa:1});
+  }
+  return p;
+}
+let sigtapIndex = new Map();
+function indexaSigtap(){sigtapIndex = new Map(S.sigtap.map(s=>[s.codigo,s]))}
+try{
+  const salvo = localStorage.getItem("prontuai_sigtap");
+  if(salvo){const o=JSON.parse(salvo); if(Array.isArray(o.lista)&&o.lista.length){S.sigtap=o.lista.map(([codigo,nome,valor])=>({codigo,nome,valor}));S.sigtapFonte="importada";S.sigtapInfo=o.info||""}}
+}catch(e){}
+indexaSigtap();
+
+/* ============ Utilitários ============ */
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const BRL = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
+const fmtCod = c=>{c=String(c||"").replace(/\D/g,"");return c.length===10?`${c.slice(0,2)}.${c.slice(2,4)}.${c.slice(4,6)}.${c.slice(6,9)}-${c[9]}`:(c||"—")};
+const DSEM=["dom","seg","ter","qua","qui","sex","sáb"];
+function parseData(s){const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(s||"").trim());return m?new Date(+m[3],+m[2]-1,+m[1]):null}
+function fmtData(d){return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`}
+function curta(s){return String(s||"").slice(0,5)}
+function qtd(x){return x.qtdManual!=null?x.qtdManual:(x.qtdFixa!=null?x.qtdFixa:Object.values(x.dias||{}).reduce((a,b)=>a+(+b||0),0))}
+function qtdIA(x){return x.qtdFixa!=null?x.qtdFixa:Object.values(x.dias||{}).reduce((a,b)=>a+(+b||0),0)}
+function valorUnit(x){const s=sigtapIndex.get(x.codigo);return s?s.valor:null}
+function nomeSigtap(x){const s=sigtapIndex.get(x.codigo);return s?s.nome:null}
+function permanencia(p){const a=parseData(p.internacao.admissao),b=parseData(p.internacao.alta);if(!a||!b)return null;return Math.round((b-a)/864e5)}
+function listaDias(p){
+  const set=new Set();
+  const a=parseData(p.internacao.admissao),b=parseData(p.internacao.alta);
+  if(a&&b&&b>=a&&(b-a)/864e5<=120){for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1))set.add(fmtData(d))}
+  p.procedimentos.forEach(x=>Object.keys(x.dias||{}).forEach(k=>{if(parseData(k))set.add(k)}));
+  return [...set].sort((x,y)=>parseData(x)-parseData(y));
+}
+let toastT;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),2800)}
+const atual = ()=>S.prontuarios.find(p=>p.id===S.atual);
+
+/* ============ Navegação ============ */
+function ir(view,id){
+  if(id)S.atual=id;
+  if(view==="resultado"&&!atual()){view="nova"}
+  S.view=view;
+  document.querySelectorAll(".view").forEach(v=>v.hidden=true);
+  $("#view-"+view).hidden=false;
+  if(view==="resultado")renderResultado();
+  if(view==="sigtap")renderSigtap();
+  renderMenu();
+  window.scrollTo({top:0,behavior:"instant"});
+}
+function renderMenu(){
+  $("#lista-pac").innerHTML = S.prontuarios.length? S.prontuarios.map(p=>`
+    <button class="pac-item" data-pac="${esc(p.id)}" aria-current="${S.view==="resultado"&&S.atual===p.id}">
+      <span>${esc(p.paciente.nome||"Paciente sem nome")}</span>
+      <small>${esc(p.paciente.leito||"")} · ${esc(curta(p.internacao.admissao))} a ${esc(curta(p.internacao.alta)||"—")}</small>
+    </button>`).join("") : `<div class="vazio" style="padding:8px 10px;text-align:left">Nenhum prontuário aberto.</div>`;
+  ["nova","sigtap","lgpd"].forEach(v=>$("#nav-"+v).setAttribute("aria-current",S.view===v));
+}
+document.querySelector(".menu").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.pac)ir("resultado",b.dataset.pac);
+  else if(b.dataset.view)ir(b.dataset.view);
+});
+
+/* ============ Resultado ============ */
+const ICONE_FASE={pa:"PA",uti:"UTI",enf:"ENF"};
+function renderResultado(){
+  const p=atual(); const el=$("#view-resultado");
+  if(!p){el.innerHTML="";return}
+  const perm=permanencia(p);
+  const procs=p.procedimentos;
+  const totalItens=procs.filter(x=>!x.principal).reduce((a,x)=>a+qtd(x),0);
+  let valor=0,semValor=0;procs.forEach(x=>{const v=valorUnit(x);if(v==null)semValor++;else valor+=v*qtd(x)});
+  const confer=procs.filter(x=>x.conferido).length;
+  const cidAlta=p.diagnosticos.filter(d=>d.tipo==="alta");
+  const cidPrinc=cidAlta[0]||p.diagnosticos[p.diagnosticos.length-1];
+  const outros=p.diagnosticos.filter(d=>d!==cidPrinc);
+  const nomePrinc=p.principal?(nomeSigtap(p.principal)||p.principal.descricao):null;
+
+  el.innerHTML=`
+  <div class="migalha"><b>Prontuários da sessão</b> / ${esc(p.paciente.nome)}
+    ${p.origem==="exemplo"?'<span class="selo">exemplo</span>':'<span class="selo ia">lido pela IA</span>'}
+    <span class="selo ${confer===procs.length?"ok":"aviso"}">${confer===procs.length?"conferido":"aguardando conferência"}</span>
+  </div>
+
+  <section class="painel paciente">
+    <div class="pac-esq">
+      <h1 class="pac-nome">${esc(p.paciente.nome||"Paciente sem nome")}</h1>
+      <dl class="ficha">
+        <div><dt>Registro</dt><dd>${esc(p.paciente.registro||"—")}</dd></div>
+        <div><dt>Leito</dt><dd>${esc(p.paciente.leito||"—")}</dd></div>
+        <div><dt>Nascimento</dt><dd>${esc(p.paciente.nascimento||"—")}${p.paciente.idade?` · ${esc(p.paciente.idade)} anos`:""}</dd></div>
+        <div><dt>Admissão</dt><dd>${esc(p.internacao.admissao||"—")}</dd></div>
+        <div><dt>Saída</dt><dd>${esc(p.internacao.alta||"—")}</dd></div>
+        <div><dt>Permanência</dt><dd>${perm!=null?`${perm} diárias`:"—"}</dd></div>
+        <div><dt>Desfecho</dt><dd>${esc(p.internacao.desfecho||"—")}</dd></div>
+        <div><dt>Documento</dt><dd>${esc(p.folhas||(p.paginas?p.paginas+" páginas":"—"))}</dd></div>
+      </dl>
+    </div>
+    <div class="pac-aih">
+      <div class="aih-tit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 3h6v4H9zM5 5h4M15 5h4v16H5V5"/><path d="M9 13l2 2 4-4"/></svg>Dados para a AIH</div>
+      <div class="aih-linha"><small>Procedimento principal sugerido</small><span>${p.principal?`<span class="mono" style="color:var(--azul)">${fmtCod(p.principal.codigo)}</span> ${esc(nomePrinc)}`:"Não identificado"}</span></div>
+      <div class="aih-linha"><small>CID principal e secundários</small>
+        <div class="cids">${cidPrinc?`<span class="cid principal"><b>${esc(cidPrinc.cid)}</b>${esc(cidPrinc.descricao)}</span>`:""}${outros.map(d=>`<span class="cid"><b>${esc(d.cid)}</b>${esc(d.descricao)}</span>`).join("")}</div>
+      </div>
+      <div class="aih-linha"><small>Médicos responsáveis</small><span>${(p.internacao.medicos||[]).map(esc).join("<br>")||"—"}</span></div>
+    </div>
+  </section>
+
+  <section class="kpis">
+    <div class="painel kpi destaque"><small>Valor estimado (SIGTAP)</small><strong>${BRL.format(valor)}</strong><span>${semValor?`${semValor} item(ns) sem valor na tabela`:(S.sigtapFonte==="exemplo"?"com a tabela de exemplo":"tabela importada")}</span></div>
+    <div class="painel kpi"><small>Procedimentos encontrados</small><strong>${procs.length}</strong><span>tipos diferentes no espelho</span></div>
+    <div class="painel kpi"><small>Total de itens somados</small><strong>${totalItens}</strong><span>em ${listaDias(p).length} dias de registro</span></div>
+    <div class="painel kpi"><small>Tempo de leitura</small><strong>${esc(p.tempoLeitura||"—")}</strong><span>contra cerca de 2h30 no papel</span></div>
+  </section>
+
+  ${p.alertas&&p.alertas.length?`<section class="alertas"><h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>Pontos para conferir antes de lançar</h3><ul>${p.alertas.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></section>`:""}
+
+  <section class="painel">
+    <div class="painel-cab" style="padding-bottom:0;border-bottom:0">
+      <div class="acoes" style="margin-left:0">
+        <button class="btn pri" id="bt-copiar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copiar para o MV</button>
+        <button class="btn" id="bt-csv"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg>Exportar planilha</button>
+        <button class="btn" id="bt-todos">Marcar tudo como conferido</button>
+      </div>
+      <div class="acoes"><button class="btn perigo" id="bt-descartar">Descartar prontuário</button></div>
+    </div>
+    <div class="abas" role="tablist">
+      ${[["espelho","Espelho da AIH"],["mapa","Mapa diário"],["tempo","Linha do tempo"],["resumo","Resumo clínico"]].map(([k,t])=>`<button role="tab" data-aba="${k}" aria-selected="${S.aba===k}">${t}</button>`).join("")}
+    </div>
+    <div class="aba" id="aba-espelho" ${S.aba!=="espelho"?"hidden":""}>${htmlEspelho(p,valor)}</div>
+    <div class="aba" id="aba-mapa" ${S.aba!=="mapa"?"hidden":""}>${htmlMapa(p)}</div>
+    <div class="aba" id="aba-tempo" ${S.aba!=="tempo"?"hidden":""}>${htmlTempo(p)}</div>
+    <div class="aba" id="aba-resumo" ${S.aba!=="resumo"?"hidden":""}>${htmlResumo(p)}</div>
+  </section>`;
+  ligaResultado(p);
+}
+function htmlEspelho(p,valor){
+  const procs=p.procedimentos; const confer=procs.filter(x=>x.conferido).length;
+  return `<div class="tabela-rola"><table>
+    <thead><tr><th class="c">Conferido</th><th>Código SIGTAP</th><th>Procedimento</th><th>Onde está</th><th class="r">Qtd.</th><th class="r">Valor unit.</th><th class="r">Subtotal</th><th class="c">Leitura</th></tr></thead>
+    <tbody>${procs.map((x,i)=>{const v=valorUnit(x);const q=qtd(x);const alt=x.qtdManual!=null&&x.qtdManual!==qtdIA(x);
+      return `<tr class="${x.conferido?"conferido":""}">
+      <td class="c"><input type="checkbox" class="chk" id="chk-${i}" data-i="${i}" ${x.conferido?"checked":""} aria-label="Conferido"></td>
+      <td class="mono num" style="white-space:nowrap">${fmtCod(x.codigo)}</td>
+      <td><div class="proc-nome">${esc(nomeSigtap(x)||x.descricao)}${x.principal?'<span class="tag-principal">principal</span>':""}</div>${x.observacao||(nomeSigtap(x)&&x.descricao)?`<div class="proc-sub">${esc(x.observacao||("No prontuário: "+x.descricao))}</div>`:""}</td>
+      <td style="white-space:nowrap;color:var(--ink-2)">${esc(x.fonte||"—")}</td>
+      <td class="r"><input type="number" min="0" class="qtd num ${alt?"alterada":""}" id="qtd-${i}" data-i="${i}" value="${q}" aria-label="Quantidade" title="${alt?"Alterado pelo faturista. A IA contou "+qtdIA(x):"Contado pela IA"}"></td>
+      <td class="r num">${v==null?'<span style="color:var(--ink-3)">sem valor</span>':BRL.format(v)}</td>
+      <td class="r num" style="font-weight:700">${v==null?"—":BRL.format(v*q)}</td>
+      <td class="c"><span class="conf ${esc(x.confianca||"media")}">${{alta:"segura",media:"conferir",baixa:"duvidosa"}[x.confianca]||"conferir"}</span></td>
+    </tr>`}).join("")}</tbody>
+    <tfoot><tr><td></td><td colspan="3">Total da conta</td><td class="r num">${procs.filter(x=>!x.principal).reduce((a,x)=>a+qtd(x),0)}</td><td></td><td class="r num">${BRL.format(valor)}</td><td></td></tr></tfoot>
+  </table></div>
+  <div class="rodape-tab"><span><b class="num">${confer}</b> de <b class="num">${procs.length}</b> linhas conferidas</span><div class="barra"><i style="width:${procs.length?confer/procs.length*100:0}%"></i></div>${S.sigtapFonte==="exemplo"?'<span class="selo aviso">códigos e valores de exemplo</span>':""}</div>`;
+}
+function htmlMapa(p){
+  const ds=listaDias(p); const procs=p.procedimentos.filter(x=>!x.principal);
+  const max=Math.max(1,...procs.flatMap(x=>Object.values(x.dias||{}).map(Number)));
+  const fases=p.fases||{};
+  return `<div class="tabela-rola"><table class="mapa">
+    <thead><tr><th>Procedimento</th>${ds.map(d=>{const dt=parseData(d);const f=fases[d];return `<th class="dia num">${curta(d)}<small>${DSEM[dt.getDay()]}</small>${f?`<span class="fase ${f}">${ICONE_FASE[f]}</span>`:""}</th>`}).join("")}<th class="r">Total</th></tr></thead>
+    <tbody>${procs.map(x=>`<tr><td><div class="proc-nome" style="font-size:13.5px">${esc(x.descricao)}</div><div class="proc-sub mono">${fmtCod(x.codigo)}</div></td>
+      ${ds.map(d=>{const n=+(x.dias||{})[d]||0;const pct=n?Math.round(18+n/max*62):0;return `<td><span class="cel num ${n?"":"zero"}" style="${n?`background:color-mix(in srgb,var(--azul) ${pct}%,transparent);color:${pct>45?"#fff":"var(--ink)"}`:""}">${n||"·"}</span></td>`}).join("")}
+      <td class="r tot num">${qtdIA(x)}</td></tr>`).join("")}</tbody>
+  </table></div>
+  <div class="legenda"><span><span class="fase pa">PA</span> pronto atendimento</span><span><span class="fase uti">UTI</span> terapia intensiva</span><span><span class="fase enf">ENF</span> enfermaria</span><span>Cada célula é o que o faturista anotaria no rascunho para aquele dia.</span></div>`;
+}
+const TIPOS={admissao:"Admissão",exame:"Exame",intercorrencia:"Intercorrência",diagnostico:"Diagnóstico",procedimento:"Procedimento",transferencia:"Transferência",alta:"Alta",obito:"Óbito"};
+function htmlTempo(p){
+  const ev=[...(p.eventos||[])].sort((a,b)=>(parseData(a.data)-parseData(b.data))||String(a.hora).localeCompare(String(b.hora)));
+  if(!ev.length)return `<div class="vazio">Nenhum evento clínico identificado.</div>`;
+  return `<ol class="tempo">${ev.map(e=>{const dt=parseData(e.data);return `<li class="t-${esc(e.tipo)}"><div class="quando num">${esc(curta(e.data))}<small>${esc(e.hora||(dt?DSEM[dt.getDay()]:""))}</small></div><span class="ponto"><i></i></span><div><span class="tipo">${esc(TIPOS[e.tipo]||e.tipo||"Registro")}</span><p>${esc(e.texto)}</p></div></li>`}).join("")}</ol>`;
+}
+function htmlResumo(p){
+  return `<div class="resumo"><p>${esc(p.resumo||"Sem resumo.")}</p>
+    <div><h3 style="font-size:14px;margin-bottom:10px;color:var(--ink-2)">Evolução do diagnóstico</h3><div class="diag-evol">${p.diagnosticos.map(d=>`<div><b>${esc(d.cid)}</b><span>${esc(d.descricao)}<br><small style="color:var(--ink-3)">${esc(d.data||"")} · ${esc({entrada:"entrada",alta:"alta / atual",secundario:"secundário",atualizado:"atualizado"}[d.tipo]||d.tipo||"")}</small></span></div>`).join("")}</div></div></div>`;
+}
+function ligaResultado(p){
+  document.querySelectorAll(".abas button").forEach(b=>b.onclick=()=>{S.aba=b.dataset.aba;document.querySelectorAll(".abas button").forEach(x=>x.setAttribute("aria-selected",x===b));document.querySelectorAll(".aba").forEach(a=>a.hidden=a.id!=="aba-"+S.aba)});
+  document.querySelectorAll(".chk").forEach(c=>c.onchange=()=>{p.procedimentos[+c.dataset.i].conferido=c.checked;renderResultado()});
+  document.querySelectorAll(".qtd").forEach(c=>c.onchange=()=>{const x=p.procedimentos[+c.dataset.i];const v=Math.max(0,Math.round(+c.value||0));x.qtdManual=v===qtdIA(x)?null:v;renderResultado();const n=$("#qtd-"+c.dataset.i);n&&n.focus()});
+  $("#bt-todos").onclick=()=>{p.procedimentos.forEach(x=>x.conferido=true);renderResultado();toast("Todas as linhas marcadas como conferidas")};
+  $("#bt-copiar").onclick=()=>copiarMV(p);
+  $("#bt-csv").onclick=()=>exportarCSV(p);
+  const bd=$("#bt-descartar");
+  bd.onclick=()=>{
+    if(bd.dataset.confirma){S.prontuarios=S.prontuarios.filter(x=>x!==p);S.atual=S.prontuarios[0]?.id;toast("Prontuário descartado da memória");ir(S.atual?"resultado":"nova");return}
+    bd.dataset.confirma="1";bd.textContent="Clique de novo para descartar";setTimeout(()=>{if(bd.isConnected){delete bd.dataset.confirma;bd.textContent="Descartar prontuário"}},4000);
+  };
+}
+function linhasEspelho(p){return p.procedimentos.map(x=>({cod:fmtCod(x.codigo),nome:nomeSigtap(x)||x.descricao,q:qtd(x),v:valorUnit(x),conf:x.conferido}))}
+async function copiarMV(p){
+  const txt=["Código SIGTAP\tProcedimento\tQuantidade",...linhasEspelho(p).map(l=>`${l.cod}\t${l.nome}\t${l.q}`)].join("\n");
+  try{await navigator.clipboard.writeText(txt);toast("Espelho copiado. Cole no MV ou numa planilha.")}
+  catch(e){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("Espelho copiado")}catch(_){toast("Não deu para copiar. Use Exportar planilha.")}ta.remove()}
+}
+async function exportarCSV(p){
+  const n=v=>v==null?"":v.toFixed(2).replace(".",",");
+  const linhas=[`Paciente;${p.paciente.nome};Registro;${p.paciente.registro||""};Admissão;${p.internacao.admissao||""};Saída;${p.internacao.alta||""}`,"",
+    "Código SIGTAP;Procedimento;Quantidade;Valor unitário;Subtotal;Conferido",
+    ...linhasEspelho(p).map(l=>[l.cod,`"${String(l.nome).replace(/"/g,'""')}"`,l.q,n(l.v),n(l.v==null?null:l.v*l.q),l.conf?"sim":"não"].join(";"))];
+  const csv="﻿"+linhas.join("\r\n");
+  const nome="espelho_aih_"+(p.paciente.nome||"paciente").normalize("NFD").replace(/[^\w]+/g,"_").toLowerCase()+".csv";
+  let dl=null;try{dl=window.claude?await claude.use("downloads"):null}catch(e){}
+  if(!dl){toast("Download indisponível aqui. Use Copiar para o MV.");return}
+  try{await dl.save({filename:nome,data:csv});toast("Planilha salva")}catch(e){if(e&&e.code!=="declined")toast("Não foi possível salvar a planilha")}
+}
+
+/* ============ Exemplos na tela de envio ============ */
+function renderExemplos(){
+  $("#exemplos").innerHTML=EXEMPLOS.map(e=>`<button class="painel exemplo" data-ex="${e.id}"><span class="doc">PDF</span><span><b>${esc(e.paciente.nome)}</b><small>${esc(e.diagnosticos.find(d=>d.tipo==="alta").descricao)} · ${permanencia(e)} diárias · ${esc(e.folhas)}</small></span></button>`).join("");
+  $("#exemplos").onclick=ev=>{const b=ev.target.closest("[data-ex]");if(!b)return;
+    if(!S.prontuarios.find(p=>p.id===b.dataset.ex))S.prontuarios.push(prepara(structuredClone(EXEMPLOS.find(x=>x.id===b.dataset.ex))));
+    ir("resultado",b.dataset.ex)};
+}
+
+/* ============ Leitura por IA ============ */
+let sampleFn=null, sampleLimites=null;
+if(window.claude&&claude.use){claude.use("sample").then(s=>{sampleFn=s;if(s)s.limits().then(l=>sampleLimites=l).catch(()=>{})}).catch(()=>{})}
+if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"}
+
+const drop=$("#drop");
+["dragenter","dragover"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add("sobre")}));
+["dragleave","drop"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove("sobre")}));
+drop.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f)analisar(f)});
+$("#arquivo").addEventListener("change",e=>{const f=e.target.files[0];e.target.value="";if(f)analisar(f)});
+
+let controle=null;
+const ETAPAS=["Abrindo o PDF","Lendo as folhas","Contando procedimentos por dia","Cruzando com a tabela SIGTAP","Montando o espelho da AIH"];
+function mostraProgresso(etapa,detalhe,erro){
+  const box=$("#progresso-box");box.hidden=false;
+  box.innerHTML=`<div class="painel progresso">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><h3 style="font-size:17px">${esc(box.dataset.arquivo||"")}</h3>${etapa<ETAPAS.length&&!erro?'<button class="btn perigo" id="bt-parar" style="margin-left:auto">Parar leitura</button>':""}</div>
+    <ol class="etapas">${ETAPAS.map((t,i)=>`<li class="${i<etapa?"feita":i===etapa&&!erro?"ativa":""}"><span class="m"></span>${t}${i===etapa&&detalhe&&!erro?` <span style="color:var(--ink-3);font-weight:500">· ${esc(detalhe)}</span>`:""}</li>`).join("")}</ol>
+    ${erro?`<div class="msg erro">${esc(erro)}</div>`:""}</div>`;
+  const bp=$("#bt-parar");if(bp)bp.onclick=()=>controle&&controle.abort();
+}
+const ERROS={not_granted:"A leitura por IA não foi autorizada nesta tela.",sampling_disabled:"A IA não está disponível para esta conta.",rate_limited:"Muitas leituras seguidas. Aguarde um pouco e tente de novo.",session_expired:"Sua sessão expirou. Entre de novo no Claude.",prompt_too_large:"Um trecho ficou grande demais para a IA. Tente um PDF menor.",invalid_json:"A IA respondeu fora do formato esperado. Tente de novo.",refused:"A IA não aceitou ler este conteúdo.",images_unavailable:"Este PDF é só imagem (escaneado) e esta tela não consegue enviar imagens para a IA.",image_rejected:"Uma das páginas escaneadas não pôde ser lida."};
+
+function catalogoPrompt(){
+  if(S.sigtap.length>400)return "";
+  return "\n\nTABELA SIGTAP DISPONÍVEL (código;nome). Use exatamente estes códigos quando houver correspondência; se não houver, use null:\n"+S.sigtap.map(s=>`${s.codigo};${s.nome}`).join("\n");
+}
+function montaPrompt(parte,total,conteudo,ehImagem){
+  return `Você é um faturista hospitalar experiente do SUS, do setor de internação. Sua tarefa é ler o prontuário e fazer o que o faturista faz no rascunho de papel: contar cada procedimento faturável realizado no paciente, dia a dia, para lançar na AIH.
+
+Esta é a parte ${parte} de ${total} do prontuário${ehImagem?" (as imagens anexas são as páginas escaneadas desta parte)":""}.
+
+Regras:
+- Conte CADA registro individual. Se no dia houve 6 aferições de pressão, são 6. Se diz "6 aferições", conte 6.
+- Diárias (UTI, ventilação mecânica, oxigenoterapia) contam 1 por dia em que aconteceram.
+- Não invente nada que não esteja escrito. Se algo for inferido, use confianca "media" ou "baixa" e explique em observacao.
+- Medicamentos (antibióticos, soros) não são procedimentos; cite-os só em alertas se forem relevantes.
+- Datas sempre no formato DD/MM/AAAA. Se o ano não aparecer, use o ano da internação.
+- Em "fonte", diga a folha ou página onde está o registro, se houver.
+- Em "alertas", aponte o que o faturista precisa conferir: folhas faltando, registros ilegíveis, datas incoerentes, mudança de diagnóstico.
+${catalogoPrompt()}
+
+Responda SOMENTE com um JSON neste formato (campos sem informação ficam null ou lista vazia):
+{"paciente":{"nome":null,"registro":null,"leito":null,"nascimento":null,"idade":null},
+"internacao":{"admissao":null,"alta":null,"desfecho":null,"medicos":[]},
+"diagnosticos":[{"cid":"U07.1","descricao":"COVID-19","data":"13/07/2026","tipo":"entrada|alta|secundario"}],
+"procedimento_principal":{"codigo":null,"descricao":null},
+"procedimentos":[{"codigo":"0301100039","descricao":"Aferição de pressão arterial","dias":{"10/07/2026":2,"11/07/2026":3},"fonte":"Folha 02","confianca":"alta|media|baixa","observacao":null}],
+"eventos":[{"data":"10/07/2026","hora":"10:15","tipo":"admissao|exame|procedimento|diagnostico|intercorrencia|transferencia|alta|obito","texto":"frase curta"}],
+"resumo":"3 a 5 frases sobre a internação nesta parte",
+"alertas":[]}
+${ehImagem?"":"\nTEXTO DO PRONTUÁRIO:\n"+conteudo}`;
+}
+
+async function extraiPDF(arquivo,onPagina){
+  if(!window.pdfjsLib)throw {code:"pdf",message:"O leitor de PDF não carregou. Recarregue a página."};
+  const buf=await arquivo.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const paginas=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const pg=await pdf.getPage(i);const tc=await pg.getTextContent();
+    let txt="",ultY=null;
+    for(const it of tc.items){const y=it.transform?it.transform[5]:null;if(ultY!==null&&y!==null&&Math.abs(y-ultY)>2)txt+="\n";txt+=it.str;ultY=y}
+    paginas.push(txt.replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim());
+    onPagina(i,pdf.numPages);
+  }
+  return {pdf,paginas};
+}
+async function paginaImagem(pdf,n){
+  const pg=await pdf.getPage(n);const vp=pg.getViewport({scale:1.6});
+  const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
+  await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+  return await new Promise(r=>c.toBlob(r,"image/jpeg",.82));
+}
+function chave(x){return x.codigo?String(x.codigo).replace(/\D/g,""):String(x.descricao||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/\W+/g," ").trim()}
+function casaSigtap(x){
+  let c=String(x.codigo||"").replace(/\D/g,"");
+  if(c&&sigtapIndex.has(c))return c;
+  const alvo=new Set(chave({descricao:x.descricao}).split(" ").filter(w=>w.length>3));
+  if(!alvo.size)return c||null;
+  let melhor=null,nota=0;
+  for(const s of S.sigtap){const ws=chave({descricao:s.nome}).split(" ").filter(w=>w.length>3);const n=ws.filter(w=>alvo.has(w)).length/Math.max(alvo.size,1);if(n>nota){nota=n;melhor=s.codigo}}
+  return nota>=.5?melhor:(c||null);
+}
+function junta(partes,arquivo,numPag,segundos){
+  const p={id:"ia"+Date.now(),origem:"ia",arquivo:arquivo.name,paginas:numPag,folhas:numPag+" páginas",tempoLeitura:segundos<60?`${segundos} s`:`${Math.floor(segundos/60)} min ${segundos%60} s`,
+    paciente:{nome:null,registro:null,leito:null,nascimento:null,idade:null},internacao:{admissao:null,alta:null,desfecho:null,medicos:[]},
+    diagnosticos:[],principal:null,procedimentos:[],eventos:[],resumo:"",alertas:[]};
+  const procs=new Map();const resumos=[];
+  for(const r of partes){
+    if(!r||typeof r!=="object")continue;
+    for(const k of ["nome","registro","leito","nascimento","idade"])if(!p.paciente[k]&&r.paciente?.[k])p.paciente[k]=r.paciente[k];
+    if(!p.internacao.admissao&&r.internacao?.admissao)p.internacao.admissao=r.internacao.admissao;
+    if(r.internacao?.alta)p.internacao.alta=r.internacao.alta;
+    if(r.internacao?.desfecho)p.internacao.desfecho=r.internacao.desfecho;
+    (r.internacao?.medicos||[]).forEach(m=>{if(m&&!p.internacao.medicos.includes(m))p.internacao.medicos.push(String(m))});
+    (r.diagnosticos||[]).forEach(d=>{if(!d?.cid)return;const ex=p.diagnosticos.find(x=>x.cid===d.cid);if(ex){if(d.tipo==="alta")ex.tipo="alta"}else p.diagnosticos.push({cid:String(d.cid),descricao:String(d.descricao||""),data:d.data||"",tipo:d.tipo||"entrada"})});
+    if(r.procedimento_principal?.codigo||r.procedimento_principal?.descricao)p.principal={codigo:String(r.procedimento_principal.codigo||"").replace(/\D/g,""),descricao:r.procedimento_principal.descricao||""};
+    (r.procedimentos||[]).forEach(x=>{
+      if(!x||(!x.codigo&&!x.descricao))return;
+      x.codigo=casaSigtap(x);const k=chave(x);
+      const alvo=procs.get(k)||{codigo:x.codigo||"",descricao:String(x.descricao||nomeSigtap(x)||""),dias:{},fonte:"",confianca:x.confianca||"media",observacao:x.observacao||null,_fontes:new Set()};
+      Object.entries(x.dias||{}).forEach(([d,n])=>{n=Math.round(+n||0);if(n>0)alvo.dias[d]=(alvo.dias[d]||0)+n});
+      if(x.fonte)alvo._fontes.add(String(x.fonte));
+      if(x.confianca==="baixa"||(x.confianca==="media"&&alvo.confianca==="alta"))alvo.confianca=x.confianca;
+      procs.set(k,alvo);
+    });
+    (r.eventos||[]).forEach(e=>{if(e?.texto)p.eventos.push({data:e.data||"",hora:e.hora||"",tipo:e.tipo||"procedimento",texto:String(e.texto)})});
+    if(r.resumo)resumos.push(String(r.resumo));
+    (r.alertas||[]).forEach(a=>{if(a&&!p.alertas.includes(a))p.alertas.push(String(a))});
+  }
+  p.procedimentos=[...procs.values()].filter(x=>Object.keys(x.dias).length).map(x=>{x.fonte=[...x._fontes].slice(0,3).join(", ");delete x._fontes;return x});
+  p.procedimentos.sort((a,b)=>(valorUnit(b)||0)-(valorUnit(a)||0));
+  if(p.principal&&!p.principal.codigo)p.principal.codigo=casaSigtap(p.principal)||"";
+  if(p.principal&&!p.principal.codigo&&!p.principal.descricao)p.principal=null;
+  if(p.paciente.nascimento&&!p.paciente.idade){const n=parseData(p.paciente.nascimento),a=parseData(p.internacao.admissao)||new Date();if(n)p.paciente.idade=Math.floor((a-n)/315576e5)}
+  p.resumo=resumos.length>2?resumos[0]+" "+resumos[resumos.length-1]:resumos.join(" ");
+  if(partes.length>1)p.alertas.push(`O prontuário foi lido em ${partes.length} partes e as contagens foram somadas.`);
+  if(!p.diagnosticos.length)p.diagnosticos.push({cid:"—",descricao:"CID não identificado",data:"",tipo:"alta"});
+  return prepara(p);
+}
+
+async function analisar(arquivo){
+  if(!/\.pdf$/i.test(arquivo.name)&&arquivo.type!=="application/pdf"){toast("Envie um arquivo PDF");return}
+  ir("nova");
+  $("#progresso-box").dataset.arquivo=arquivo.name;
+  if(!sampleFn){mostraProgresso(0,"","A leitura por IA só funciona com o sistema aberto no Claude. Enquanto isso, veja os prontuários de exemplo abaixo.");return}
+  controle=new AbortController();const sinal=controle.signal;const t0=Date.now();
+  try{
+    mostraProgresso(0);
+    const {pdf,paginas}=await extraiPDF(arquivo,(i,n)=>mostraProgresso(1,`folha ${i} de ${n}`));
+    const totalTxt=paginas.reduce((a,t)=>a+t.length,0);
+    const escaneado=totalTxt/paginas.length<80;
+    const blocos=[];
+    if(!escaneado){
+      const LIM=120000;let atual="";
+      paginas.forEach((t,i)=>{const pedaco=`\n\n===== PÁGINA ${i+1} =====\n${t}`;if(atual.length+pedaco.length>LIM&&atual){blocos.push({texto:atual});atual=""}atual+=pedaco});
+      if(atual)blocos.push({texto:atual});
+    }else{
+      if(!sampleLimites?.images)throw {code:"images_unavailable"};
+      const porVez=Math.max(1,Math.min(sampleLimites.images.maxCount||5,8));
+      for(let i=0;i<paginas.length;i+=porVez)blocos.push({paginas:Array.from({length:Math.min(porVez,paginas.length-i)},(_,k)=>i+k+1)});
+    }
+    const partes=[];
+    for(let b=0;b<blocos.length;b++){
+      if(sinal.aborted)throw {code:"cancelled"};
+      mostraProgresso(2,blocos.length>1?`parte ${b+1} de ${blocos.length}`:"a IA está lendo, pode levar até 1 minuto");
+      const bl=blocos[b];const opts={signal:sinal,modelTier:"default"};
+      if(bl.paginas){mostraProgresso(2,`preparando imagens das páginas ${bl.paginas[0]}–${bl.paginas[bl.paginas.length-1]}`);opts.images=await Promise.all(bl.paginas.map(n=>paginaImagem(pdf,n)));mostraProgresso(2,`parte ${b+1} de ${blocos.length}`)}
+      partes.push(await sampleFn.json(montaPrompt(b+1,blocos.length,bl.texto||"",!!bl.paginas),opts));
+    }
+    mostraProgresso(3);await new Promise(r=>setTimeout(r,350));
+    const p=junta(partes,arquivo,paginas.length,Math.round((Date.now()-t0)/1000));
+    mostraProgresso(4);await new Promise(r=>setTimeout(r,350));
+    if(!p.procedimentos.length){mostraProgresso(4,"","A IA não encontrou procedimentos neste PDF. Confira se é um prontuário de internação.");return}
+    S.prontuarios.push(p);S.aba="espelho";$("#progresso-box").hidden=true;
+    toast("Prontuário lido. Confira o espelho.");ir("resultado",p.id);
+  }catch(e){
+    if(e?.code==="cancelled"){$("#progresso-box").hidden=true;toast("Leitura interrompida");return}
+    mostraProgresso(1,"",ERROS[e?.code]||e?.message||"Não foi possível ler este PDF. Tente de novo.");
+  }
+}
+
+/* ============ Tabela SIGTAP ============ */
+function renderSigtap(){
+  const imp=S.sigtapFonte==="importada";
+  $("#sigtap-aviso").innerHTML=imp
+    ?`<div class="aviso-sigtap ok"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--verde)" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><p><b>Tabela importada em uso.</b> ${esc(S.sigtapInfo)} Os espelhos já usam estes códigos e valores.</p></div>`
+    :`<div class="aviso-sigtap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg><p><b>Esta é uma tabela de exemplo com ${S.sigtap.length} procedimentos.</b> Os códigos e valores servem só para a demonstração. Importe a tabela oficial do SIGTAP: aceita o arquivo <span class="mono">tb_procedimento.txt</span> da competência ou uma planilha CSV com código;nome;valor.</p></div>`;
+  $("#restaurar-sigtap").hidden=!imp;
+  const q=($("#busca-sigtap").value||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const qd=q.replace(/\D/g,"");
+  const lista=S.sigtap.filter(s=>!q||(qd&&s.codigo.includes(qd))||s.nome.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").includes(q));
+  $("#tb-sigtap").innerHTML=lista.slice(0,200).map(s=>`<tr><td class="mono num" style="white-space:nowrap">${fmtCod(s.codigo)}</td><td>${esc(s.nome)}</td><td class="r num">${BRL.format(s.valor||0)}</td></tr>`).join("")||`<tr><td colspan="3" class="vazio">Nenhum procedimento encontrado.</td></tr>`;
+  $("#rodape-sigtap").textContent=lista.length>200?`Mostrando 200 de ${lista.length} procedimentos. Refine a busca.`:`${lista.length} procedimento(s)`;
+}
+$("#busca-sigtap").addEventListener("input",renderSigtap);
+$("#restaurar-sigtap").onclick=()=>{S.sigtap=SIGTAP_EXEMPLO;S.sigtapFonte="exemplo";S.sigtapInfo="";try{localStorage.removeItem("prontuai_sigtap")}catch(e){}indexaSigtap();renderSigtap();toast("Voltou para a tabela de exemplo")};
+$("#arq-sigtap").addEventListener("change",async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  const buf=await f.arrayBuffer();
+  let txt=new TextDecoder("utf-8",{fatal:false}).decode(buf);
+  if(txt.includes("\uFFFD"))txt=new TextDecoder("windows-1252").decode(buf);
+  const linhas=txt.split(/\r?\n/).filter(l=>l.trim());
+  const lista=[];
+  const fixo=linhas.length&&/^\d{10}/.test(linhas[0])&&linhas[0].length>=318;
+  if(fixo){
+    // Layout oficial tb_procedimento.txt: CO_PROCEDIMENTO(10) NO_PROCEDIMENTO(250) ... VL_SH(12) VL_SA(12) VL_SP(12)
+    let comp="";
+    for(const l of linhas){const cod=l.slice(0,10);if(!/^\d{10}$/.test(cod))continue;
+      const v=(+l.slice(282,294)+ +l.slice(294,306)+ +l.slice(306,318))/100;
+      lista.push({codigo:cod,nome:l.slice(10,260).trim(),valor:isFinite(v)?v:0});comp=comp||l.slice(-6).trim()}
+    S.sigtapInfo=`${lista.length} procedimentos do arquivo ${f.name}${/^\d{6}$/.test(comp)?`, competência ${comp.slice(4,6)}/${comp.slice(0,4)}`:""}.`;
+  }else{
+    for(const l of linhas){const c=l.split(/[;\t]/).map(x=>x.replace(/^"|"$/g,"").trim());const cod=(c[0]||"").replace(/\D/g,"");if(cod.length!==10)continue;
+      lista.push({codigo:cod,nome:c[1]||"",valor:+(String(c[2]||"0").replace(/\./g,"").replace(",","."))||0})}
+    S.sigtapInfo=`${lista.length} procedimentos do arquivo ${f.name}.`;
+  }
+  if(!lista.length){toast("Não reconheci procedimentos neste arquivo");return}
+  S.sigtap=lista;S.sigtapFonte="importada";indexaSigtap();
+  try{localStorage.setItem("prontuai_sigtap",JSON.stringify({info:S.sigtapInfo,lista:lista.map(s=>[s.codigo,s.nome,s.valor])}))}catch(e){}
+  renderSigtap();toast("Tabela SIGTAP importada");
+});
+
+/* ============ Início ============ */
+renderExemplos();
+ir("resultado","ex1");
+</script>
