@@ -993,6 +993,15 @@ function perguntaCopia(nome){return new Promise(fim=>{
   $("#pc-nao").onclick=()=>resp(false);$("#pc-sim").onclick=()=>resp(true);
   $("#pc-nao").focus();
 })}
+/* O Apps Script recebe no máximo uns 50 MB por envio, e o PDF cresce 1/3 em base64 */
+const LIMITE_COPIA=30*1024*1024;
+const mb=b=>(b/1048576).toLocaleString("pt-BR",{maximumFractionDigits:0})+" MB";
+/* Tempo que falta na leitura das folhas, a partir do ritmo até agora */
+function faltam(i,n,ms){
+  if(n<200||i<20||i>=n)return "";
+  const s=ms/i*(n-i)/1000;
+  return s<60?" · menos de 1 min":` · faltam cerca de ${Math.ceil(s/60)} min`;
+}
 function enviaCopia(arquivo){return new Promise(fim=>{
   const r=new FileReader();
   r.onerror=()=>fim(false);
@@ -1017,15 +1026,17 @@ function abreCarregando(nome){
   </div>`;
   el.hidden=false;document.body.classList.add("lendo");
   const t0=performance.now(),barra=el.querySelector(".carr-barra i"),pct=el.querySelector(".carr-det b"),det=el.querySelector(".carr-det span"),lis=[...el.querySelectorAll(".carr-etapas li")];
-  let pronto=false,aberto=true;
+  let pronto=false,aberto=true,lidas=null;
   (function quadro(){if(!aberto)return;
-    const f=pronto?1:Math.min(.94,(performance.now()-t0)/DUR_LEITURA);
+    /* PDF grande: a barra segue as folhas já lidas, e não só o relógio */
+    const f=pronto?1:Math.min(.94,(performance.now()-t0)/DUR_LEITURA,lidas===null?1:lidas*.94);
     const et=pronto?ETAPAS.length:Math.min(ETAPAS.length-1,Math.floor(f/.94*ETAPAS.length));
     barra.style.width=(f*100).toFixed(1)+"%";pct.textContent=Math.round(f*100)+"%";
     lis.forEach((li,i)=>li.className=i<et?"feita":i===et?"ativa":"");
     requestAnimationFrame(quadro)})();
   return {
     detalhe:t=>{det.textContent=t},
+    folhas:(i,n)=>{lidas=i/n},
     termina:async()=>{await pausa(Math.max(0,DUR_LEITURA-(performance.now()-t0)));pronto=true;det.textContent="Pronto";await pausa(300)},
     fecha:()=>{aberto=false;el.hidden=true;document.body.classList.remove("lendo")}
   };
@@ -1034,26 +1045,30 @@ async function extraiPDF(arquivo,onPagina){
   if(!window.pdfjsLib)throw new Error("O leitor de PDF não carregou. Confira a internet e recarregue a página.");
   const pdf=await pdfjsLib.getDocument({data:await arquivo.arrayBuffer()}).promise;
   const paginas=[];
-  for(let i=1;i<=pdf.numPages;i++){
-    const tc=await (await pdf.getPage(i)).getTextContent();
-    let txt="",ultY=null;
-    for(const it of tc.items){const y=it.transform?it.transform[5]:null;if(ultY!==null&&y!==null&&Math.abs(y-ultY)>2&&!txt.endsWith("\n"))txt+="\n";txt+=it.str;if(it.hasEOL)txt+="\n";ultY=y}
-    paginas.push(txt.replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim());
-    if(i%10===0||i===pdf.numPages)onPagina(i,pdf.numPages);
-  }
+  try{
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);const tc=await pg.getTextContent();
+      let txt="",ultY=null;
+      for(const it of tc.items){const y=it.transform?it.transform[5]:null;if(ultY!==null&&y!==null&&Math.abs(y-ultY)>2&&!txt.endsWith("\n"))txt+="\n";txt+=it.str;if(it.hasEOL)txt+="\n";ultY=y}
+      paginas.push(txt.replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim());
+      pg.cleanup(); /* solta a memória da folha: prontuários de milhares de folhas */
+      if(i%10===0||i===pdf.numPages)onPagina(i,pdf.numPages);
+    }
+  }finally{pdf.destroy()}
   return paginas;
 }
 async function analisar(arquivo){
   if(!/\.pdf$/i.test(arquivo.name)&&arquivo.type!=="application/pdf"){toast("Envie um arquivo PDF");return}
   ir("nova");
   $("#progresso-box").dataset.arquivo=arquivo.name;$("#progresso-box").hidden=true;
-  const copia=URL_COPIAS&&await perguntaCopia(arquivo.name)?enviaCopia(arquivo):null;
+  const grande=URL_COPIAS&&arquivo.size>LIMITE_COPIA;
+  const copia=URL_COPIAS&&!grande&&await perguntaCopia(arquivo.name)?enviaCopia(arquivo):null;
   const tela=abreCarregando(arquivo.name);
   const t0=performance.now();
   let etapa=0;
   try{
     etapa=1;
-    const paginas=await extraiPDF(arquivo,(i,n)=>tela.detalhe(`Folha ${i} de ${n}`));
+    const paginas=await extraiPDF(arquivo,(i,n)=>{tela.folhas(i,n);tela.detalhe(`Folha ${i.toLocaleString("pt-BR")} de ${n.toLocaleString("pt-BR")}${faltam(i,n,performance.now()-t0)}`)});
     tela.detalhe(paginas.length===1?"1 folha":`${paginas.length} folhas`);
     const letras=paginas.join("").replace(/\s/g,"").length;
     if(letras/paginas.length<40)throw new Error("Este PDF é só imagem (folhas escaneadas) e não tem texto para ler. Ele precisa passar por OCR, o reconhecimento de texto, antes. Isso entra numa próxima etapa do projeto.");
@@ -1064,7 +1079,7 @@ async function analisar(arquivo){
     await tela.termina();tela.fecha();
     S.prontuarios.push(p);S.aba="espelho";
     const st=copia?await Promise.race([copia,pausa(50).then(()=>null)]):undefined;
-    toast(st===true?"Prontuário lido e cópia guardada.":st===false?"Prontuário lido. A cópia não pôde ser guardada.":"Prontuário lido. Confira o espelho.");
+    toast(st===true?"Prontuário lido e cópia guardada.":st===false?"Prontuário lido. A cópia não pôde ser guardada.":grande?`Prontuário lido. O PDF tem ${mb(arquivo.size)}, grande demais para guardar cópia.`:"Prontuário lido. Confira o espelho.");
     if(st===null)copia.then(ok=>toast(ok?"Cópia do prontuário guardada.":"A cópia não pôde ser guardada."));
     ir("resultado",p.id);
   }catch(e){
