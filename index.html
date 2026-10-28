@@ -698,8 +698,11 @@ function lerProntuario(paginas){
     if(pac.idade&&+pac.idade<60)notaAcomp=`O prontuário cita acompanhante, mas o paciente tem ${pac.idade} anos: a diária de acompanhante de idoso não se aplica (confira se cabe outra, como a de gestante ou de pessoa com deficiência).`;
     else if(admD&&altaD&&altaD>admD){
       const c={regra:R,dias:{},provas:acompProvas,confianca:"media",observacao:`Acompanhante registrado no prontuário: 1 diária por pernoite, de ${_fmt(admD).slice(0,5)} a ${_fmt(_maisDias(altaD,-1)).slice(0,5)}${pac.idade?"":". Confirme se o paciente tem 60 anos ou mais"}`};
-      for(let d=new Date(admD);d<altaD;d=_maisDias(d,1))c.dias[_fmt(d)]=1;
-      contagem.set("acomp",c);
+      // Na UTI não há acompanhante: esses dias saem da conta
+      const uti=contagem.get("uti");let nUti=0;
+      for(let d=new Date(admD);d<altaD;d=_maisDias(d,1)){if(uti&&uti.dias[_fmt(d)]){nUti++;continue}c.dias[_fmt(d)]=1}
+      if(nUti)c.observacao+=`, sem os ${nUti} dia(s) de UTI`;
+      if(Object.keys(c.dias).length)contagem.set("acomp",c);
     }else notaAcomp="O prontuário cita acompanhante, mas faltam as datas de entrada e saída para calcular a diária de acompanhante de idoso. Informe a quantidade no espelho.";
   }
   const fases={};
