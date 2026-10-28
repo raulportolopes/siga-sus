@@ -21,6 +21,8 @@ Abra o `index.html` no navegador e envie os PDFs de `fonte/ficticios/`. Totais e
 
 Os exemplos de `fonte/exemplos/` (Maria e José) também aparecem no próprio site e não podem mudar de resultado sem motivo.
 
+Para prontuários grandes, `python fonte/ficticios/gera_longo.py 7000 longo` gera `longo.html` (vire PDF imprimindo no Chrome) e `longo.json` com a contagem esperada de cada procedimento. Com 1.037 páginas o espelho dá R$ 5.382,42. As abas Rastreio e Linha do tempo mostram as linhas em partes ("Mostrar mais") para não travar.
+
 ## Regras que não podem quebrar
 
 - Nada de lookbehind em regex (`(?<=`, `(?<!`): o Safari do iPad/iPhone antes do iOS 16.4 deixa o site inteiro em branco.
