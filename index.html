@@ -367,7 +367,7 @@ body.lendo{overflow:hidden}
     </div>
     <div class="menu-rodape">
       <b><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Tudo roda no seu computador</b>
-      O PDF é lido aqui mesmo, sem enviar nada para servidor. Ao fechar, tudo é descartado.
+      O PDF é lido aqui mesmo. Uma cópia só vai para a equipe do SIGA-SUS se você autorizar.
     </div>
   </nav>
 
@@ -423,10 +423,11 @@ body.lendo{overflow:hidden}
       <div class="migalha"><b>Cadastros</b> / Privacidade (LGPD)</div>
       <div class="painel sobre-txt">
         <h2 style="font-size:22px">Como os dados do paciente são tratados</h2>
-        <p>O PDF é aberto e lido dentro do seu navegador, pelo próprio computador do faturista. Nenhum arquivo, texto ou resultado é enviado para servidor, nem para inteligência artificial.</p>
+        <p>O PDF é aberto e lido dentro do seu navegador, pelo próprio computador do faturista. Nenhum texto ou resultado é enviado para servidor, nem para inteligência artificial.</p>
+        <p>Ao enviar um prontuário, o sistema pergunta se pode guardar uma cópia do PDF. Só quando você clica em "Guardar cópia" o arquivo vai para um armazenamento da equipe do SIGA-SUS, usado apenas para testar e melhorar o leitor. A cópia contém os dados do paciente: autorize só se a sua unidade permitir.</p>
         <p>Os prontuários aparecem na lista "Prontuários da sessão" apenas enquanto a tela estiver aberta. O botão "Descartar" apaga um prontuário na hora, e fechar a página apaga todos.</p>
         <h3>O que fica salvo</h3>
-        <p>Só a tabela SIGTAP importada, que é pública, fica guardada neste navegador para não precisar importar de novo.</p>
+        <p>Neste navegador, só a tabela SIGTAP importada, que é pública, fica guardada para não precisar importar de novo. Fora dele, ficam apenas as cópias de PDF que você autorizou guardar.</p>
         <h3>Como a leitura funciona</h3>
         <p>O leitor segue o padrão do prontuário: cabeçalho do paciente, datas do dia, horários, listas com marcadores e linhas de resumo como "6 Aferições de Pressão Arterial". Cada regra está na tela Tabela SIGTAP, e cada número do espelho aparece na aba Rastreio com o trecho e a página de onde veio.</p>
         <h3>Responsabilidade do faturista</h3>
@@ -438,6 +439,7 @@ body.lendo{overflow:hidden}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script>window.SIGA_URL_COPIAS="https://script.google.com/macros/s/AKfycbw2KbL_oNd_f_6S1GEo2JLltk5cP7l0pRU-eAcmCsOnQPoocLxBbgpzbJfvmXsmE169_w/exec";</script>
 <script>
 (function(){function aviso(){if(window.SIGA_OK)return;var v=document.getElementById("view-resultado");if(!v||v.textContent.replace(/\s/g,""))return;v.hidden=false;
 v.innerHTML='<div class="painel" style="padding:24px;margin-top:24px"><h3 style="margin:0 0 8px">Este navegador não conseguiu abrir o SIGA-SUS</h3><p style="margin:0;color:var(--ink-2)">Atualize o sistema do aparelho (no iPad ou iPhone: Ajustes, Geral, Atualização de Software) e recarregue a página. Se não for possível atualizar, abra no computador.</p></div>'}
