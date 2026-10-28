@@ -282,6 +282,12 @@ body.lendo{overflow:hidden}
 .carr-etapas li.feita{color:var(--ink-2)}
 .carr-etapas li.feita .m{border-color:var(--verde);background:var(--verde)}
 .carr-etapas li.feita .m::after{content:"";width:4px;height:8px;border:solid var(--surface);border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+.carr-card.pergunta{text-align:left}
+.carr-card.pergunta h2{font-size:21px}
+.carr-card.pergunta p{margin:0 0 12px;color:var(--ink-2);line-height:1.45}
+.carr-card.pergunta .carr-arq{margin-bottom:14px;color:var(--ink-3)}
+.pc-botoes{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+.pc-botoes .btn{padding:10px 18px;font-size:15px}
 @keyframes carr-in{from{opacity:0}to{opacity:1}}
 @keyframes carr-scan{to{top:calc(100% - 15px)}}
 @keyframes carr-gira{to{transform:rotate(360deg)}}
@@ -553,7 +559,8 @@ function lerProntuario(paginas){
 
     // Alta / óbito
     if(/ALTA HOSPITALAR|ALTA M[ÉE]DICA|^\S*\s*-?\s*ALTA\b/i.test(t)&&!/Diagn[óo]stico/i.test(t.slice(0,15))){alta=alta||dataLinha;desfecho="Alta hospitalar";evento(dataLinha,"alta",(/(\d+)º DIA/i.exec(t)?`Alta hospitalar no ${/(\d+)º DIA/i.exec(t)[1]}º dia de internação`:"Alta hospitalar"),hora)}
-    if(/\b[ÓO]BITO\b/i.test(t)&&/constatad|declarad|evolui\S* (a|para) [óo]bito|^\S+\s*-\s*[ÓO]BITO/i.test(t)){alta=alta||dataLinha;desfecho="Óbito";evento(dataLinha,"obito","Óbito",hora)}
+    // \b não funciona antes de letra acentuada ("ÓBITO"), por isso o grupo com letras
+    if(/(^|[^A-Za-zÀ-ú])[ÓO]BITO(?![A-Za-zÀ-ú])/i.test(t)&&/constatad|declarad|evolui\S* (a|para) [óo]bito|^\S+\s*-\s*(\d{1,2}:\d{2}h?\s*-\s*)?[ÓO]BITO/i.test(t)){alta=alta||dataLinha;desfecho="Óbito";evento(dataLinha,"obito","Óbito",hora)}
 
     // UTI: entrada e saída
     const cabecalho=_caixaAlta(t)||/^\[P[ÁA]GINA/i.test(t);
@@ -965,6 +972,34 @@ function mostraProgresso(etapa,detalhe,erro){
     ${erro?`<div class="msg erro">${esc(erro)}</div>`:""}</div>`;
 }
 const pausa=ms=>new Promise(r=>setTimeout(r,ms));
+/* Cópia autorizada: só no site, quando o endereço de recebimento estiver configurado. Nunca envia sem a pessoa clicar em "Guardar cópia" */
+const URL_COPIAS=window.SIGA_URL_COPIAS||"";
+function perguntaCopia(nome){return new Promise(fim=>{
+  let el=$("#pergunta-copia");
+  if(!el){el=document.createElement("div");el.id="pergunta-copia";el.className="carregando";document.body.appendChild(el)}
+  el.innerHTML=`<div class="carr-card pergunta" role="dialog" aria-modal="true" aria-labelledby="pc-tit">
+    <h2 id="pc-tit">Guardar uma cópia deste prontuário?</h2>
+    <p class="carr-arq">${esc(nome)}</p>
+    <p>A cópia do PDF vai para a equipe do SIGA-SUS e é usada só para testar e melhorar o leitor. O arquivo tem dados do paciente: autorize apenas se a sua unidade permitir.</p>
+    <p>A leitura funciona do mesmo jeito nos dois casos.</p>
+    <div class="pc-botoes"><button class="btn" id="pc-nao">Não guardar</button><button class="btn pri" id="pc-sim">Guardar cópia</button></div>
+  </div>`;
+  el.hidden=false;document.body.classList.add("lendo");
+  const resp=v=>{document.removeEventListener("keydown",tecla);el.hidden=true;document.body.classList.remove("lendo");fim(v)};
+  const tecla=e=>{if(e.key==="Escape")resp(false)};
+  document.addEventListener("keydown",tecla);
+  $("#pc-nao").onclick=()=>resp(false);$("#pc-sim").onclick=()=>resp(true);
+  $("#pc-nao").focus();
+})}
+function enviaCopia(arquivo){return new Promise(fim=>{
+  const r=new FileReader();
+  r.onerror=()=>fim(false);
+  r.onload=()=>{const b64=String(r.result).split(",")[1]||"";
+    fetch(URL_COPIAS,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({chave:"siga-sus-copias",nome:arquivo.name,origem:location.host,arquivo:b64})})
+      .then(()=>fim(true),()=>fim(false))};
+  r.readAsDataURL(arquivo);
+})}
 /* Tela "Lendo o seu prontuário": fica no mínimo DUR_LEITURA ms, mesmo quando a leitura termina antes */
 const DUR_LEITURA=3800;
 function abreCarregando(nome){
@@ -1010,6 +1045,7 @@ async function analisar(arquivo){
   if(!/\.pdf$/i.test(arquivo.name)&&arquivo.type!=="application/pdf"){toast("Envie um arquivo PDF");return}
   ir("nova");
   $("#progresso-box").dataset.arquivo=arquivo.name;$("#progresso-box").hidden=true;
+  const copia=URL_COPIAS&&await perguntaCopia(arquivo.name)?enviaCopia(arquivo):null;
   const tela=abreCarregando(arquivo.name);
   const t0=performance.now();
   let etapa=0;
@@ -1025,7 +1061,10 @@ async function analisar(arquivo){
     if(p.procedimentos.filter(x=>!x.principal).length===0)throw new Error("Não encontrei procedimentos no padrão conhecido. Confira se é um prontuário de internação ou mande um exemplo deste modelo para ajustarmos as regras.");
     await tela.termina();tela.fecha();
     S.prontuarios.push(p);S.aba="espelho";
-    toast("Prontuário lido. Confira o espelho.");ir("resultado",p.id);
+    const st=copia?await Promise.race([copia,pausa(50).then(()=>null)]):undefined;
+    toast(st===true?"Prontuário lido e cópia guardada.":st===false?"Prontuário lido. A cópia não pôde ser guardada.":"Prontuário lido. Confira o espelho.");
+    if(st===null)copia.then(ok=>toast(ok?"Cópia do prontuário guardada.":"A cópia não pôde ser guardada."));
+    ir("resultado",p.id);
   }catch(e){
     tela.fecha();
     mostraProgresso(etapa,"",e&&e.message?e.message:"Não foi possível ler este PDF. Tente de novo.");
