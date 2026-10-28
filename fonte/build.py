@@ -72,6 +72,7 @@ body.lendo{overflow:hidden}
 @keyframes carr-in{from{opacity:0}to{opacity:1}}
 @keyframes carr-scan{to{top:calc(100% - 15px)}}
 @keyframes carr-gira{to{transform:rotate(360deg)}}
+.mais-linhas{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 4px 2px;font-size:13.5px;color:var(--ink-2)}
 @media (prefers-reduced-motion:reduce){.carregando,.carr-scan,.carr-etapas li.ativa .m{animation:none}}
 .toast{position:fixed''')
 # Aviso no lugar da tela em branco se o navegador não rodar o sistema (ES5 de propósito)
@@ -106,7 +107,11 @@ if len(sys.argv)>2:
             ('<p>Só a tabela SIGTAP importada, que é pública, fica guardada neste navegador para não precisar importar de novo.</p>','<p>Neste navegador, só a tabela SIGTAP importada, que é pública, fica guardada para não precisar importar de novo. Fora dele, ficam apenas as cópias de PDF que você autorizou guardar.</p>')]:
             assert hs.count(a)==1,a[:50]; hs=hs.replace(a,b)
         cfg='<script>window.SIGA_URL_COPIAS='+json.dumps(url)+';</script>\n'
-    out=hs+cfg+scripts+dados+main
+    # No site o pdf.js lê o PDF num worker, fora da tela: com o worker carregado como script comum, tudo roda na tela
+    # e ela congela até o fim (prontuários de milhares de folhas). A versão do Claude mantém o script comum
+    tag_worker='<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js"></script>\n'
+    assert scripts.count(tag_worker)==1
+    out=hs+cfg+scripts.replace(tag_worker,'')+dados+main
     i=out.index('</style>')+len('</style>')
     site=('<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n'
           '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'

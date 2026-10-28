@@ -74,7 +74,7 @@ function lerProntuario(paginas){
 
   // 3. Varredura linha a linha
   const ROTULO_PROSA=/^(Hist[óo]rico|Conduta|Evolu[çc][ãa]o|Diagn[óo]stico|Parecer|Exame f[íi]sico|Queixa|HDA|Impress[ãa]o|Observa[çc]|Paciente|Hip[óo]tese|Plano|Prescri[çc])/i;
-  const contagem=new Map(); const ignorados=[]; const eventos=[]; const medicos=[]; const cids=[]; const folhas=[];
+  const contagem=new Map(); const ignorados=[]; const eventos=[]; const jaEvento=new Set(); const medicos=[]; const cids=[]; const folhas=[];
   let dataAtual=admissao?_data(...admissao.split("/")):null, prosa=false, pendente=null;
   let horaCab="", utiIni=null, utiFim=null, utiProvas=[], alta=null, desfecho=null, diagEntradaTxt=null, viaPA=false, totaisInformados=[];
   const soma=(regra,data,qtd,linha,trecho)=>{
@@ -86,7 +86,7 @@ function lerProntuario(paginas){
     c.provas.push({data:k,pag:linha.pag,trecho:_limpa(trecho).slice(0,170),qtd:regra.tipo==="diaria"?1:qtd});
     contagem.set(regra.id,c);
   };
-  const evento=(data,tipo,txt,hora)=>{if(!data)return;hora=hora||(dataAtual&&+data===+dataAtual?horaCab:"");txt=_limpa(txt).replace(/\s*\.$/,"");if(!txt)return;const d=_fmt(data);if(!eventos.some(e=>e.data===d&&e.texto===txt))eventos.push({data:d,hora:hora||"",tipo,texto:txt.length>170?txt.slice(0,167)+"…":txt})};
+  const evento=(data,tipo,txt,hora)=>{if(!data)return;hora=hora||(dataAtual&&+data===+dataAtual?horaCab:"");txt=_limpa(txt).replace(/\s*\.$/,"");if(!txt)return;const d=_fmt(data),ch=d+"\u0001"+txt;if(!jaEvento.has(ch)){jaEvento.add(ch);eventos.push({data:d,hora:hora||"",tipo,texto:txt.length>170?txt.slice(0,167)+"…":txt})}};
 
   for(const L of linhas){
     let t=L.t;
@@ -238,7 +238,7 @@ function lerProntuario(paginas){
     diagnosticos,principal,procedimentos,fases,
     eventos:eventos.sort((a,b)=>(_data(...a.data.split("/"))-_data(...b.data.split("/")))||String(a.hora).localeCompare(String(b.hora))),
     resumo,alertas,ignorados,
-    folhas:folhas.length?`Folhas ${String(folhas[0][0]).padStart(2,"0")} a ${String(Math.max(...folhas.map(f=>f[1]))).padStart(2,"0")}`:null,
+    folhas:folhas.length?`Folhas ${String(folhas[0][0]).padStart(2,"0")} a ${String(folhas.reduce((a,f)=>Math.max(a,f[1]),0)).padStart(2,"0")}`:null,
     paginas:paginas.length,ms
   };
 }

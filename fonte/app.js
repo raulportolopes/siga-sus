@@ -11,7 +11,7 @@ const EXEMPLOS = [
 ];
 
 /* ============ Estado ============ */
-const S = {prontuarios:[], atual:"ex1", view:"resultado", aba:"espelho", sigtap:SIGTAP_OFICIAL, sigtapFonte:"oficial", sigtapInfo:SIGTAP_INFO_OFICIAL, competencia:SIGTAP_DADOS.competencia};
+const S = {prontuarios:[], atual:"ex1", view:"resultado", aba:"espelho", lim:{}, sigtap:SIGTAP_OFICIAL, sigtapFonte:"oficial", sigtapInfo:SIGTAP_INFO_OFICIAL, competencia:SIGTAP_DADOS.competencia};
 let sigtapIndex = new Map();
 function indexaSigtap(){sigtapIndex = new Map(S.sigtap.map(s=>[s.codigo,s]))}
 try{
@@ -51,7 +51,7 @@ function permanencia(p){const a=parseData(p.internacao.admissao),b=parseData(p.i
 function listaDias(p){
   const set=new Set();
   const a=parseData(p.internacao.admissao),b=parseData(p.internacao.alta);
-  if(a&&b&&b>=a&&(b-a)/864e5<=120){for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1))set.add(fmtData(d))}
+  if(a&&b&&b>=a&&(b-a)/864e5<=800){for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1))set.add(fmtData(d))}
   p.procedimentos.forEach(x=>Object.keys(x.dias||{}).forEach(k=>{if(parseData(k))set.add(k)}));
   return [...set].sort((x,y)=>parseData(x)-parseData(y));
 }
@@ -61,6 +61,7 @@ const atual = ()=>S.prontuarios.find(p=>p.id===S.atual);
 
 /* ============ Navegação ============ */
 function ir(view,id){
+  if(id&&id!==S.atual)S.lim={};
   if(id)S.atual=id;
   if(view==="resultado"&&!atual())view="nova";
   S.view=view;
@@ -150,11 +151,7 @@ function renderResultado(){
     <div class="abas" role="tablist">
       ${[["espelho","Espelho da AIH"],["mapa","Mapa diário"],["rastreio","Rastreio"],["tempo","Linha do tempo"],["resumo","Resumo"]].map(([k,t])=>`<button role="tab" data-aba="${k}" aria-selected="${S.aba===k}">${t}</button>`).join("")}
     </div>
-    <div class="aba" id="aba-espelho" ${S.aba!=="espelho"?"hidden":""}>${htmlEspelho(p,valor)}</div>
-    <div class="aba" id="aba-mapa" ${S.aba!=="mapa"?"hidden":""}>${htmlMapa(p)}</div>
-    <div class="aba" id="aba-rastreio" ${S.aba!=="rastreio"?"hidden":""}>${htmlRastreio(p)}</div>
-    <div class="aba" id="aba-tempo" ${S.aba!=="tempo"?"hidden":""}>${htmlTempo(p)}</div>
-    <div class="aba" id="aba-resumo" ${S.aba!=="resumo"?"hidden":""}>${htmlResumo(p)}</div>
+    ${Object.entries({espelho:()=>htmlEspelho(p,valor),mapa:()=>htmlMapa(p),rastreio:()=>htmlRastreio(p),tempo:()=>htmlTempo(p),resumo:()=>htmlResumo(p)}).map(([k,f])=>`<div class="aba" id="aba-${k}" ${S.aba!==k?"hidden":""}>${S.aba===k?f():""}</div>`).join("\n    ")}
   </section>`;
   ligaResultado(p);
 }
@@ -179,7 +176,7 @@ function htmlEspelho(p,valor){
 }
 function htmlMapa(p){
   const ds=listaDias(p); const procs=p.procedimentos.filter(x=>!x.principal);
-  const max=Math.max(1,...procs.flatMap(x=>Object.values(x.dias||{}).map(Number)));
+  const max=procs.reduce((m,x)=>Object.values(x.dias||{}).reduce((a,v)=>Math.max(a,+v||0),m),1);
   const fases=p.fases||{}; const usadas=new Set(Object.values(fases));
   return `<div class="tabela-rola"><table class="mapa">
     <thead><tr><th>Procedimento</th>${ds.map(d=>{const dt=parseData(d);const f=fases[d];return `<th class="dia num">${curta(d)}<small>${DSEM[dt.getDay()]}</small>${f?`<span class="fase ${f}">${ICONE_FASE[f]}</span>`:""}</th>`}).join("")}<th class="r">Total</th></tr></thead>
@@ -189,6 +186,10 @@ function htmlMapa(p){
   </table></div>
   <div class="legenda">${usadas.has("pa")?'<span><span class="fase pa">PA</span> pronto atendimento</span>':""}${usadas.has("uti")?'<span><span class="fase uti">UTI</span> terapia intensiva</span>':""}${usadas.has("enf")?'<span><span class="fase enf">ENF</span> enfermaria</span>':""}<span>Cada célula é o que o faturista anotaria no rascunho para aquele dia.</span></div>`;
 }
+/* Listas longas aparecem em partes, com "Mostrar mais", para a tela não travar */
+const PASSO_INI=300,PASSO=1000;
+const lim=k=>S.lim[k]||PASSO_INI;
+function maisLinhas(k,total){const n=lim(k);return total>n?`<div class="mais-linhas"><span>Mostrando <b class="num">${n.toLocaleString("pt-BR")}</b> de <b class="num">${total.toLocaleString("pt-BR")}</b></span><button class="btn" data-mais="${k}">Mostrar mais ${Math.min(PASSO,total-n).toLocaleString("pt-BR")}</button></div>`:""}
 function htmlRastreio(p){
   const linhas=[];
   p.procedimentos.forEach(x=>(x.provas||[]).forEach(pv=>linhas.push({...pv,proc:x.descricao})));
@@ -197,25 +198,27 @@ function htmlRastreio(p){
   return `<p class="rast-intro">Cada linha abaixo é um trecho do prontuário que o leitor transformou em procedimento. Assim o faturista confere de onde veio cada número.</p>
   <div class="tabela-rola"><table>
     <thead><tr><th>Data</th><th>Pág.</th><th>Trecho do prontuário</th><th>Contou como</th><th class="r">Qtd.</th></tr></thead>
-    <tbody>${linhas.map(l=>`<tr><td class="num" style="white-space:nowrap">${esc(curta(l.data))}</td><td class="num">${esc(l.pag)}</td><td class="trecho">${esc(l.trecho)}</td><td style="white-space:nowrap;font-weight:600">${esc(l.proc)}</td><td class="r num" style="font-weight:700">${l.qtd}</td></tr>`).join("")}</tbody>
-  </table></div>
+    <tbody>${linhas.slice(0,lim("rastreio")).map(l=>`<tr><td class="num" style="white-space:nowrap">${esc(curta(l.data))}</td><td class="num">${esc(l.pag)}</td><td class="trecho">${esc(l.trecho)}</td><td style="white-space:nowrap;font-weight:600">${esc(l.proc)}</td><td class="r num" style="font-weight:700">${l.qtd}</td></tr>`).join("")}</tbody>
+  </table></div>${maisLinhas("rastreio",linhas.length)}
   ${ign.length?`<h3 class="rast-sub">Citados, mas não contados</h3><div class="tabela-rola"><table>
     <thead><tr><th>Data</th><th>Pág.</th><th>Trecho do prontuário</th><th>Seria</th><th>Por que não contou</th></tr></thead>
-    <tbody>${ign.map(l=>`<tr><td class="num" style="white-space:nowrap">${esc(curta(l.data))}</td><td class="num">${esc(l.pag)}</td><td class="trecho">${esc(l.trecho)}</td><td style="white-space:nowrap">${esc(l.regra)}</td><td><span class="conf media">${esc(l.motivo)}</span></td></tr>`).join("")}</tbody>
-  </table></div>`:""}`;
+    <tbody>${ign.slice(0,lim("ign")).map(l=>`<tr><td class="num" style="white-space:nowrap">${esc(curta(l.data))}</td><td class="num">${esc(l.pag)}</td><td class="trecho">${esc(l.trecho)}</td><td style="white-space:nowrap">${esc(l.regra)}</td><td><span class="conf media">${esc(l.motivo)}</span></td></tr>`).join("")}</tbody>
+  </table></div>${maisLinhas("ign",ign.length)}`:""}`;
 }
 const TIPOS={admissao:"Admissão",exame:"Exame",intercorrencia:"Evolução",diagnostico:"Diagnóstico",procedimento:"Procedimento",transferencia:"Transferência",alta:"Alta",obito:"Óbito"};
 function htmlTempo(p){
   const ev=p.eventos||[];
   if(!ev.length)return `<div class="vazio">Nenhum evento clínico identificado.</div>`;
-  return `<ol class="tempo">${ev.map(e=>{const dt=parseData(e.data);return `<li class="t-${esc(e.tipo)}"><div class="quando num">${esc(curta(e.data))}<small>${esc(e.hora||(dt?DSEM[dt.getDay()]:""))}</small></div><span class="ponto"><i></i></span><div><span class="tipo">${esc(TIPOS[e.tipo]||e.tipo||"Registro")}</span><p>${esc(e.texto)}</p></div></li>`}).join("")}</ol>`;
+  return `<ol class="tempo">${ev.slice(0,lim("tempo")).map(e=>{const dt=parseData(e.data);return `<li class="t-${esc(e.tipo)}"><div class="quando num">${esc(curta(e.data))}<small>${esc(e.hora||(dt?DSEM[dt.getDay()]:""))}</small></div><span class="ponto"><i></i></span><div><span class="tipo">${esc(TIPOS[e.tipo]||e.tipo||"Registro")}</span><p>${esc(e.texto)}</p></div></li>`}).join("")}</ol>${maisLinhas("tempo",ev.length)}`;
 }
 function htmlResumo(p){
   return `<div class="resumo"><p>${esc(p.resumo||"Sem resumo.")}</p>
     <div><h3 style="font-size:14px;margin-bottom:10px;color:var(--ink-2)">Diagnósticos encontrados</h3><div class="diag-evol">${p.diagnosticos.map((d,i)=>`<div><b>${esc(d.cid)}</b><span>${esc(d.descricao)}<br><small style="color:var(--ink-3)">${esc(d.data||"")} · ${i===0?"principal":esc({entrada:"entrada",alta:"alta",secundario:"secundário",atualizado:"atualizado"}[d.tipo]||d.tipo||"")}</small></span></div>`).join("")||"Nenhum CID encontrado."}</div></div></div>`;
 }
 function ligaResultado(p){
-  document.querySelectorAll(".abas button").forEach(b=>b.onclick=()=>{S.aba=b.dataset.aba;document.querySelectorAll(".abas button").forEach(x=>x.setAttribute("aria-selected",x===b));document.querySelectorAll(".aba").forEach(a=>a.hidden=a.id!=="aba-"+S.aba)});
+  const remonta=()=>{const y=window.scrollY;renderResultado();window.scrollTo(0,y)};
+  document.querySelectorAll(".abas button").forEach(b=>b.onclick=()=>{if(S.aba===b.dataset.aba)return;S.aba=b.dataset.aba;remonta();const n=document.querySelector(`.abas button[data-aba="${S.aba}"]`);n&&n.focus()});
+  document.querySelectorAll("[data-mais]").forEach(b=>b.onclick=()=>{S.lim[b.dataset.mais]=lim(b.dataset.mais)+PASSO;remonta()});
   document.querySelectorAll(".chk").forEach(c=>c.onchange=()=>{p.procedimentos[+c.dataset.i].conferido=c.checked;renderResultado()});
   document.querySelectorAll(".qtd").forEach(c=>c.onchange=()=>{const x=p.procedimentos[+c.dataset.i];const v=Math.max(0,Math.round(+c.value||0));x.qtdManual=v===qtdIA(x)?null:v;renderResultado();const n=$("#qtd-"+c.dataset.i);n&&n.focus()});
   $("#bt-todos").onclick=()=>{p.procedimentos.forEach(x=>x.conferido=true);renderResultado();toast("Todas as linhas marcadas como conferidas")};
@@ -351,6 +354,7 @@ async function extraiPDF(arquivo,onPagina){
       paginas.push(txt.replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim());
       pg.cleanup(); /* solta a memória da folha: prontuários de milhares de folhas */
       if(i%10===0||i===pdf.numPages)onPagina(i,pdf.numPages);
+      if(i%25===0)await pausa(0); /* deixa a tela atualizar quando o pdf.js roda sem worker */
     }
   }finally{pdf.destroy()}
   return paginas;
