@@ -87,18 +87,18 @@ scripts=aviso+'''<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/l
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 '''
 def js(o): return json.dumps(o,ensure_ascii=False,separators=(',',':')).replace('</','<\\/')
-dados='<script>\nconst SIGTAP_DADOS='+open('sigtap_202608.json',encoding='utf-8').read().replace('</','<\\/')+';\nconst PAG_EX1='+js(json.load(open('paginas_maria.json')))+';\nconst PAG_EX2='+js(json.load(open('paginas_jose.json')))+';\n</script>\n'
+dados='<script>\nconst SIGTAP_DADOS='+open('sigtap_202608.json',encoding='utf-8').read().replace('</','<\\/')+';\nconst PAG_EX1='+js(json.load(open('paginas_maria.json',encoding='utf-8')))+';\nconst PAG_EX2='+js(json.load(open('paginas_jose.json',encoding='utf-8')))+';\n</script>\n'
 leitor=open('leitor.js',encoding='utf-8').read().replace('if(typeof module!=="undefined")module.exports={lerProntuario,REGRAS};','')
 app=open('app.js',encoding='utf-8').read()
 main='<script>\n'+leitor+'\n'+app+'\nwindow.SIGA_OK=true;\n</script>\n'
 out=head+scripts+dados+main
 assert '�' not in out
-open(sys.argv[1],'w',encoding='utf-8').write(out)
+open(sys.argv[1],'w',encoding='utf-8',newline='\n').write(out)
 print(len(out.encode()))
 # Versão do site (GitHub Pages): documento completo. Sem doctype e viewport o celular abre em modo de compatibilidade e na largura de computador
 if len(sys.argv)>2:
     # Cópia autorizada: endereço do Apps Script em copias_url.txt. Sem ele, o site fica igual ao protótipo
-    url=open('copias_url.txt').read().strip() if os.path.exists('copias_url.txt') else ''
+    url=open('copias_url.txt',encoding='utf-8').read().strip() if os.path.exists('copias_url.txt') else ''
     hs=head;cfg=''
     if url:
         for a,b in [('O PDF é lido aqui mesmo, sem enviar nada para servidor. Ao fechar, tudo é descartado.','O PDF é lido aqui mesmo. Uma cópia só vai para a equipe do SIGA-SUS se você autorizar.'),
@@ -111,5 +111,5 @@ if len(sys.argv)>2:
     site=('<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n'
           '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
           +out[:i]+'\n</head>\n<body>'+out[i:]+'</body>\n</html>\n')
-    open(sys.argv[2],'w',encoding='utf-8').write(site)
+    open(sys.argv[2],'w',encoding='utf-8',newline='\n').write(site)
     print(len(site.encode()))

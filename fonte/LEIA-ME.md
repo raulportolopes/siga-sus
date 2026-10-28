@@ -22,7 +22,7 @@ Precisa de **Git** e **Python 3** instalados.
 
 1. Baixe o projeto: `git clone https://github.com/raulportolopes/siga-sus.git`
 2. Mude o que precisar dentro de `fonte/`
-3. Gere o site: `python3 fonte/build.py`
+3. Gere o site: `python3 fonte/build.py` (no Windows: `py fonte\build.py`)
 4. Abra o `index.html` no navegador e teste com os PDFs de `fonte/ficticios/`
 5. Publique: `git add -A`, depois `git commit -m "o que mudou"` e `git push`. Em cerca de 1 minuto o site atualiza
 

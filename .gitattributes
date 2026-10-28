@@ -1,0 +1,4 @@
+# Mantém os arquivos com fim de linha LF também no Windows, para o site gerado ficar igual em qualquer computador
+* text=auto eol=lf
+*.pdf binary
+*.zip binary
